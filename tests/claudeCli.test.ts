@@ -111,4 +111,38 @@ describe("Claude CLI backend", () => {
     ).rejects.toThrow(/claude_cli_output_too_large/);
     expect(fakeChild.kill).toHaveBeenCalled();
   });
+
+  it("redacts stderr from failed CLI errors", async () => {
+    const fakeChild = new EventEmitter() as EventEmitter & {
+      stdout: Readable;
+      stderr: Readable;
+      kill: () => void;
+    };
+    fakeChild.stdout = Readable.from([]);
+    fakeChild.stderr = Readable.from(["token oauth-secret"]);
+    fakeChild.kill = vi.fn();
+    const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "oauth-secret";
+
+    try {
+      const backend = new ClaudeCliBackend({
+        spawn() {
+          queueMicrotask(() => fakeChild.emit("close", 1));
+          return fakeChild as unknown as ChildProcess;
+        },
+        timeoutMs: 1_000
+      });
+
+      await expect(
+        backend.complete({
+          model: "sonnet",
+          effort: "medium",
+          prompt: "Reply ok",
+          stream: false
+        })
+      ).rejects.not.toThrow(/oauth-secret/);
+    } finally {
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = previous;
+    }
+  });
 });

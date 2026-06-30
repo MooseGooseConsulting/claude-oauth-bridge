@@ -1,3 +1,5 @@
+import { redactSecrets } from "./redaction.js";
+
 export interface HttpErrorBody {
   error: {
     code: string;
@@ -10,7 +12,7 @@ export class HttpError extends Error {
   readonly code: string;
 
   constructor(status: number, code: string, message: string) {
-    super(`${code}: ${message}`);
+    super(redactSecrets(message));
     this.name = "HttpError";
     this.status = status;
     this.code = code;
@@ -20,7 +22,7 @@ export class HttpError extends Error {
     return {
       error: {
         code: this.code,
-        message: this.message
+        message: redactSecrets(this.message)
       }
     };
   }

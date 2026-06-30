@@ -1,7 +1,10 @@
-import { loadConfig } from "../src/config.js";
 import { ClaudeCliBackend } from "../src/backend/claudeCli.js";
 
-const runLive = process.env.RUN_LIVE_CLAUDE === "1" && loadConfig(process.env).oauthConfigured;
+export function shouldRunLiveClaude(env: NodeJS.ProcessEnv): boolean {
+  return env.RUN_LIVE_CLAUDE === "1" && env.CLAUDE_OAUTH_LIVE_READY === "1";
+}
+
+const runLive = shouldRunLiveClaude(process.env);
 
 describe.skipIf(!runLive)("live Claude CLI bridge backend", () => {
   it("can answer through the OAuth-bearing Claude runtime", async () => {

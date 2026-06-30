@@ -37,5 +37,6 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): BridgeApp
 }
 
 function defaultLogger(event: Record<string, unknown>): void {
-  process.stdout.write(`${JSON.stringify({ level: "info", ...event })}\n`);
+  process.stdout.write(`${JSON.stringify(redactSecrets({ level: "info", ...event }))}\n`);
 }
+import { redactSecrets } from "./redaction.js";

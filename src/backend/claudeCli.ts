@@ -3,6 +3,7 @@ import type { ChildProcess, SpawnOptions } from "node:child_process";
 import type { Readable } from "node:stream";
 
 import type { BackendCompleteRequest, BackendCompleteResult, BridgeBackend } from "./types.js";
+import { redactSecrets } from "../redaction.js";
 
 type SpawnFunction = (
   command: string,
@@ -60,6 +61,16 @@ export class ClaudeCliBackend implements BridgeBackend {
       const stderr = collectStream(child.stderr, this.maxOutputBytes);
       const guardedStdout = killOnOutputOverflow(stdout, child);
       const guardedStderr = killOnOutputOverflow(stderr, child);
+      const streams = Promise.all([guardedStdout, guardedStderr]);
+      void streams.catch((error: unknown) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        child.kill();
+        reject(error);
+      });
 
       const timer = setTimeout(() => {
         if (settled) {
@@ -67,6 +78,7 @@ export class ClaudeCliBackend implements BridgeBackend {
         }
         settled = true;
         child.kill();
+        void streams.catch(() => undefined);
         reject(new Error("claude_cli_timeout"));
       }, this.timeoutMs);
 
@@ -76,6 +88,7 @@ export class ClaudeCliBackend implements BridgeBackend {
         }
         settled = true;
         clearTimeout(timer);
+        void streams.catch(() => undefined);
         reject(error);
       });
       child.on("close", (code) => {
@@ -84,10 +97,10 @@ export class ClaudeCliBackend implements BridgeBackend {
         }
         settled = true;
         clearTimeout(timer);
-        void Promise.all([guardedStdout, guardedStderr])
+        void streams
           .then(([stdoutText, stderrText]) => {
             if (code !== 0) {
-              reject(new Error(`claude_cli_failed:${code}:${stderrText.trim()}`));
+              reject(new Error(`claude_cli_failed:${code}:${redactSecrets(stderrText.trim())}`));
               return;
             }
             resolve(parseClaudeStreamJson(stdoutText));

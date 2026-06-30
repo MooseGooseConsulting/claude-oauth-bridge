@@ -49,7 +49,7 @@ describe("job prompt handling", () => {
     const { validateWorkspace } = await import("../src/jobs.js");
 
     await expect(validateWorkspace(join(tmpdir(), "missing-bridge-workspace"), [tmpdir()])).rejects.toThrow(
-      /workspace_not_found/
+      /Workspace not found/
     );
   });
 
@@ -70,7 +70,7 @@ describe("job prompt handling", () => {
 
     try {
       await expect(validateWorkspace(dir, [join(tmpdir(), "other-root")])).rejects.toThrow(
-        /workspace_not_allowed/
+        /not under an allowed root/
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -87,7 +87,7 @@ describe("job prompt handling", () => {
       await symlink(outsideRoot, linkedWorkspace, "junction");
 
       await expect(validateWorkspace(linkedWorkspace, [allowedRoot])).rejects.toThrow(
-        /workspace_not_allowed/
+        /not under an allowed root/
       );
     } finally {
       await rm(allowedRoot, { recursive: true, force: true });

@@ -164,6 +164,7 @@ async function readJson(request: IncomingMessage, maxBytes: number): Promise<Rec
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buffer.byteLength;
     if (total > maxBytes) {
+      request.resume();
       throw new HttpError(413, "request_too_large", "Request body exceeds configured size limit");
     }
     chunks.push(buffer);
@@ -239,7 +240,7 @@ function authenticate(request: IncomingMessage, config: BridgeConfig, path: stri
   const authorization = request.headers.authorization;
   const apiKey = request.headers["x-bridge-api-key"];
   const bearer = `Bearer ${config.bridgeApiKey}`;
-  if (authorization === bearer || apiKey === config.bridgeApiKey) {
+  if (headerHasValue(authorization, bearer) || headerHasValue(apiKey, config.bridgeApiKey)) {
     return;
   }
 
@@ -278,6 +279,17 @@ function writeJson(response: ServerResponse, status: number, body: unknown, requ
     "x-request-id": requestId
   });
   response.end(JSON.stringify(body));
+}
+
+function headerHasValue(value: string | string[] | undefined, expected: string): boolean {
+  if (Array.isArray(value)) {
+    return value.some((entry) => headerHasValue(entry, expected));
+  }
+
+  return value
+    ?.split(",")
+    .map((entry) => entry.trim())
+    .includes(expected) ?? false;
 }
 
 function createRequestId(): string {

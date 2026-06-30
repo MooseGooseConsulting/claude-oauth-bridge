@@ -180,6 +180,28 @@ describe("bridge HTTP server", () => {
     );
   });
 
+  it("accepts repeated x-bridge-api-key headers when one value is valid", async () => {
+    await withServer(
+      async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/v1/messages`, {
+          method: "POST",
+          headers: [
+            ["content-type", "application/json"],
+            ["x-bridge-api-key", "wrong"],
+            ["x-bridge-api-key", "bridge-secret"]
+          ],
+          body: JSON.stringify({
+            model: "claude-oauth/sonnet",
+            messages: [{ role: "user", content: "Hello" }]
+          })
+        });
+
+        expect(response.status).toBe(200);
+      },
+      { bridgeApiKey: "bridge-secret" }
+    );
+  });
+
   it("rejects text/plain POSTs when bridge auth is required", async () => {
     await withServer(
       async (baseUrl) => {
@@ -214,6 +236,24 @@ describe("bridge HTTP server", () => {
         await expect(response.json()).resolves.toMatchObject({
           error: { code: "request_too_large" }
         });
+      },
+      { maxRequestBytes: 80 }
+    );
+  });
+
+  it("destroys oversized request streams after returning request_too_large", async () => {
+    await withServer(
+      async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/v1/messages`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-oauth/sonnet",
+            messages: [{ role: "user", content: "x".repeat(200) }]
+          })
+        });
+
+        expect(response.status).toBe(413);
       },
       { maxRequestBytes: 80 }
     );

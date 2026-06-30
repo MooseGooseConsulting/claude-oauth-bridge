@@ -29,4 +29,34 @@ describe("bridge app wiring", () => {
     expect(server.listening).toBe(false);
     expect(events).toEqual([]);
   });
+
+  it("redacts secrets in default production logs", () => {
+    const writes: string[] = [];
+    const originalWrite = process.stdout.write;
+    const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "oauth-secret";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      writes.push(chunk.toString());
+      return true;
+    }) as typeof process.stdout.write;
+
+    try {
+      const { server } = createBridgeApp({
+        env: {
+          BRIDGE_AUTH_DISABLED: "1"
+        }
+      });
+      server.emit("request", { url: "/health", method: "GET", headers: {} }, {
+        statusCode: 200,
+        headersSent: false,
+        writeHead() {},
+        end() {}
+      });
+    } finally {
+      process.stdout.write = originalWrite;
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = previous;
+    }
+
+    expect(writes.join("")).not.toContain("oauth-secret");
+  });
 });

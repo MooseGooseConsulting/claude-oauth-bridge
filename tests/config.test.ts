@@ -61,18 +61,30 @@ describe("configuration and secret boundaries", () => {
   });
 
   it("redacts Claude and Anthropic credential values from logs", () => {
+    const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "oauth-secret";
     const redacted = redactSecrets({
       CLAUDE_CODE_OAUTH_TOKEN: "oauth-secret",
       ANTHROPIC_API_KEY: "api-key-secret",
       ANTHROPIC_AUTH_TOKEN: "auth-secret",
-      safe: "visible"
+      safe: "visible",
+      nested: {
+        message: "token oauth-secret should not appear"
+      }
     });
 
-    expect(redacted).toEqual({
-      CLAUDE_CODE_OAUTH_TOKEN: "[REDACTED]",
-      ANTHROPIC_API_KEY: "[REDACTED]",
-      ANTHROPIC_AUTH_TOKEN: "[REDACTED]",
-      safe: "visible"
-    });
+    try {
+      expect(redacted).toEqual({
+        CLAUDE_CODE_OAUTH_TOKEN: "[REDACTED]",
+        ANTHROPIC_API_KEY: "[REDACTED]",
+        ANTHROPIC_AUTH_TOKEN: "[REDACTED]",
+        safe: "visible",
+        nested: {
+          message: "token [REDACTED] should not appear"
+        }
+      });
+    } finally {
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = previous;
+    }
   });
 });

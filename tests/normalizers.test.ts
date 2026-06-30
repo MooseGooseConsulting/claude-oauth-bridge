@@ -10,8 +10,6 @@ describe("message normalization", () => {
     const request = normalizeMessagesRequest({
       model: "claude-oauth/sonnet",
       system: "Be terse.",
-      max_tokens: 123,
-      temperature: 0,
       messages: [
         { role: "user", content: "Hello" },
         { role: "assistant", content: [{ type: "text", text: "Hi" }] }
@@ -24,8 +22,6 @@ describe("message normalization", () => {
       effort: "medium",
       system: "Be terse.",
       prompt: "User: Hello\n\nAssistant: Hi",
-      maxTokens: 123,
-      temperature: 0,
       stream: false
     });
   });
@@ -47,7 +43,7 @@ describe("message normalization", () => {
         tools: [{ name: "readFile" }],
         messages: [{ role: "user", content: "Hello" }]
       })
-    ).toThrow(/tool_use_not_supported/);
+    ).toThrow(/Tool use is not supported/);
   });
 
   it("fails loudly for non-text content blocks instead of silently dropping them", () => {
@@ -61,7 +57,7 @@ describe("message normalization", () => {
           }
         ]
       })
-    ).toThrow(/content_block_not_supported/);
+    ).toThrow(/Only text content blocks are supported/);
   });
 
   it("fails loudly when streaming is requested because streaming translation is not implemented", () => {
@@ -71,7 +67,25 @@ describe("message normalization", () => {
         stream: true,
         messages: [{ role: "user", content: "Hello" }]
       })
-    ).toThrow(/streaming_not_supported/);
+    ).toThrow(/Streaming is not supported/);
+  });
+
+  it("fails loudly for unsupported generation controls instead of silently dropping them", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        max_tokens: 100,
+        messages: [{ role: "user", content: "Hello" }]
+      })
+    ).toThrow(/max_tokens and temperature are not supported/);
+
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        temperature: 0.4,
+        messages: [{ role: "user", content: "Hello" }]
+      })
+    ).toThrow(/max_tokens and temperature are not supported/);
   });
 
   it("normalizes OpenAI-compatible chat completions into the bridge request", () => {
@@ -81,13 +95,10 @@ describe("message normalization", () => {
         { role: "system", content: "Be exact." },
         { role: "user", content: "Reply exactly: ok" }
       ],
-      max_tokens: 20,
-      temperature: 0
     });
 
     expect(request.system).toBe("Be exact.");
     expect(request.prompt).toBe("User: Reply exactly: ok");
-    expect(request.maxTokens).toBe(20);
   });
 
   it("normalizes backend text to Anthropic Messages response shape", () => {
