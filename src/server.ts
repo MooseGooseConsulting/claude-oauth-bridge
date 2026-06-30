@@ -24,16 +24,30 @@ import {
 export interface BridgeServerOptions {
   backend: BridgeBackend;
   config: BridgeConfig;
+  logger?: (event: Record<string, unknown>) => void;
 }
 
-export function createBridgeServer({ backend, config }: BridgeServerOptions): Server {
-  const limiter = createConcurrencyLimiter(config.concurrency);
+export function createBridgeServer({ backend, config, logger }: BridgeServerOptions): Server {
+  const limiter = createConcurrencyLimiter(config.concurrency, config.maxQueueSize);
 
   return createServer((request, response) => {
+    const requestId = createRequestId();
+    const startedAt = Date.now();
+    const url = new URL(request.url ?? "/", "http://localhost");
+
     void limiter.run(async () => {
-      await handleRequest(request, response, backend, config);
+      await handleRequest(request, response, backend, config, requestId);
     }).catch((error: unknown) => {
-      writeError(response, error);
+      writeError(response, error, requestId);
+    }).finally(() => {
+      logger?.({
+        event: "request_completed",
+        requestId,
+        method: request.method ?? "UNKNOWN",
+        path: url.pathname,
+        status: response.statusCode,
+        durationMs: Date.now() - startedAt
+      });
     });
   });
 }
@@ -42,16 +56,18 @@ async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
   backend: BridgeBackend,
-  config: BridgeConfig
+  config: BridgeConfig,
+  requestId: string
 ): Promise<void> {
   const url = new URL(request.url ?? "/", "http://localhost");
+  authenticate(request, config, url.pathname);
 
   if (request.method === "GET" && url.pathname === "/health") {
     writeJson(response, 200, {
       ok: true,
       backend: config.backend,
       oauthConfigured: config.oauthConfigured
-    });
+    }, requestId);
     return;
   }
 
@@ -59,12 +75,13 @@ async function handleRequest(
     writeJson(response, 200, {
       object: "list",
       data: PUBLIC_MODEL_IDS.map((id) => ({ id, object: "model" }))
-    });
+    }, requestId);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/v1/messages") {
-    const body = (await readJson(request)) as unknown as Parameters<typeof normalizeMessagesRequest>[0];
+    ensureOauth(config);
+    const body = (await readJson(request, config.maxRequestBytes)) as unknown as Parameters<typeof normalizeMessagesRequest>[0];
     const normalized = normalizeMessagesRequest(body);
     const result = await backend.complete({
       model: normalized.backendModel,
@@ -76,12 +93,13 @@ async function handleRequest(
       stream: normalized.stream
     });
 
-    writeJson(response, 200, toMessagesResponse(createRequestId(), normalized.model, result));
+    writeJson(response, 200, toMessagesResponse(requestId, normalized.model, result), requestId);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/v1/chat/completions") {
-    const body = (await readJson(request)) as unknown as Parameters<
+    ensureOauth(config);
+    const body = (await readJson(request, config.maxRequestBytes)) as unknown as Parameters<
       typeof normalizeChatCompletionRequest
     >[0];
     const normalized = normalizeChatCompletionRequest(body);
@@ -95,14 +113,15 @@ async function handleRequest(
       stream: normalized.stream
     });
 
-    writeJson(response, 200, toChatCompletionResponse(createRequestId(), normalized.model, result));
+    writeJson(response, 200, toChatCompletionResponse(requestId, normalized.model, result), requestId);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/jobs/review") {
-    const body = await readJson(request);
+    ensureOauth(config);
+    const body = await readJson(request, config.maxRequestBytes);
     const job = normalizeReviewJob(body);
-    const workspace = await validateWorkspace(job.workspace);
+    const workspace = await validateWorkspace(job.workspace, config.allowedWorkspaceRoots);
     const prompt = buildReviewPrompt({ ...job, workspace });
     const result = await backend.complete({
       cwd: workspace,
@@ -112,14 +131,15 @@ async function handleRequest(
       stream: false
     });
 
-    writeJson(response, 200, parseJobResult(result.text));
+    writeJson(response, 200, parseJobResult(result.text), requestId);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/jobs/fix") {
-    const body = await readJson(request);
+    ensureOauth(config);
+    const body = await readJson(request, config.maxRequestBytes);
     const job = normalizeFixJob(body);
-    const workspace = await validateWorkspace(job.workspace);
+    const workspace = await validateWorkspace(job.workspace, config.allowedWorkspaceRoots);
     const prompt = buildFixPrompt({ ...job, workspace });
     const result = await backend.complete({
       cwd: workspace,
@@ -129,18 +149,24 @@ async function handleRequest(
       stream: false
     });
 
-    writeJson(response, 200, parseJobResult(result.text));
+    writeJson(response, 200, parseJobResult(result.text), requestId);
     return;
   }
 
   throw new HttpError(404, "not_found", `Route not found: ${request.method ?? "UNKNOWN"} ${url.pathname}`);
 }
 
-async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJson(request: IncomingMessage, maxBytes: number): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
+  let total = 0;
 
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.byteLength;
+    if (total > maxBytes) {
+      throw new HttpError(413, "request_too_large", "Request body exceeds configured size limit");
+    }
+    chunks.push(buffer);
   }
 
   if (chunks.length === 0) {
@@ -205,14 +231,35 @@ function requireNumber(value: unknown, field: string): number {
   throw new HttpError(400, "invalid_request", `${field} must be a positive integer`);
 }
 
-function writeError(response: ServerResponse, error: unknown): void {
+function authenticate(request: IncomingMessage, config: BridgeConfig, path: string): void {
+  if (path === "/health" || config.bridgeApiKey === undefined) {
+    return;
+  }
+
+  const authorization = request.headers.authorization;
+  const apiKey = request.headers["x-bridge-api-key"];
+  const bearer = `Bearer ${config.bridgeApiKey}`;
+  if (authorization === bearer || apiKey === config.bridgeApiKey) {
+    return;
+  }
+
+  throw new HttpError(401, "unauthorized", "Bridge API key is required");
+}
+
+function ensureOauth(config: BridgeConfig): void {
+  if (!config.oauthConfigured) {
+    throw new HttpError(503, "oauth_not_configured", "Claude OAuth is not configured");
+  }
+}
+
+function writeError(response: ServerResponse, error: unknown, requestId: string): void {
   if (response.headersSent) {
     response.destroy();
     return;
   }
 
   if (isHttpError(error)) {
-    writeJson(response, error.status, error.toJSON());
+    writeJson(response, error.status, error.toJSON(), requestId);
     return;
   }
 
@@ -221,11 +268,15 @@ function writeError(response: ServerResponse, error: unknown): void {
       code: "internal_error",
       message: "Internal server error"
     }
-  });
+  }, requestId);
 }
 
-function writeJson(response: ServerResponse, status: number, body: unknown): void {
-  response.writeHead(status, { "content-type": "application/json" });
+function writeJson(response: ServerResponse, status: number, body: unknown, requestId: string): void {
+  response.statusCode = status;
+  response.writeHead(status, {
+    "content-type": "application/json",
+    "x-request-id": requestId
+  });
   response.end(JSON.stringify(body));
 }
 

@@ -12,6 +12,7 @@ describe("bridge app wiring", () => {
     expect(server.listening).toBe(false);
     expect(backend.name).toBe("claude-cli");
     expect(config.port).toBe(9911);
+    expect(config.host).toBe("127.0.0.1");
     expect(config.oauthConfigured).toBe(true);
   });
 });

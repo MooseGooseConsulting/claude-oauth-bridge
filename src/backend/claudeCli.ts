@@ -14,6 +14,7 @@ export interface ClaudeCliBackendOptions {
   spawn?: SpawnFunction;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  maxOutputBytes?: number;
   command?: string;
 }
 
@@ -31,12 +32,14 @@ export class ClaudeCliBackend implements BridgeBackend {
   private readonly spawn: SpawnFunction;
   private readonly env: NodeJS.ProcessEnv;
   private readonly timeoutMs: number;
+  private readonly maxOutputBytes: number;
   private readonly command: string;
 
   constructor(options: ClaudeCliBackendOptions = {}) {
     this.spawn = options.spawn ?? nodeSpawn;
     this.env = options.env ?? process.env;
     this.timeoutMs = options.timeoutMs ?? 120_000;
+    this.maxOutputBytes = options.maxOutputBytes ?? 10 * 1024 * 1024;
     this.command = options.command ?? "claude";
   }
 
@@ -53,8 +56,8 @@ export class ClaudeCliBackend implements BridgeBackend {
       });
 
       let settled = false;
-      const stdout = collectStream(child.stdout);
-      const stderr = collectStream(child.stderr);
+      const stdout = collectStream(child.stdout, this.maxOutputBytes);
+      const stderr = collectStream(child.stderr, this.maxOutputBytes);
 
       const timer = setTimeout(() => {
         if (settled) {
@@ -93,7 +96,7 @@ export class ClaudeCliBackend implements BridgeBackend {
   }
 }
 
-async function collectStream(stream: Readable | null): Promise<string> {
+async function collectStream(stream: Readable | null, maxBytes: number): Promise<string> {
   if (!stream) {
     return "";
   }
@@ -102,6 +105,9 @@ async function collectStream(stream: Readable | null): Promise<string> {
   let text = "";
   for await (const chunk of stream) {
     text += chunk;
+    if (Buffer.byteLength(text, "utf8") > maxBytes) {
+      throw new Error("claude_cli_output_too_large");
+    }
   }
   return text;
 }

@@ -23,7 +23,8 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): BridgeApp
   const backend = new ClaudeCliBackend({
     ...options.backendOptions,
     env,
-    timeoutMs: config.requestTimeoutMs
+    timeoutMs: config.requestTimeoutMs,
+    maxOutputBytes: config.maxOutputBytes
   });
   const server = createBridgeServer({ backend, config });
 

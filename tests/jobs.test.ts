@@ -48,7 +48,7 @@ describe("job prompt handling", () => {
   it("rejects non-existent workspaces for jobs", async () => {
     const { validateWorkspace } = await import("../src/jobs.js");
 
-    await expect(validateWorkspace(join(tmpdir(), "missing-bridge-workspace"))).rejects.toThrow(
+    await expect(validateWorkspace(join(tmpdir(), "missing-bridge-workspace"), [tmpdir()])).rejects.toThrow(
       /workspace_not_found/
     );
   });
@@ -58,7 +58,20 @@ describe("job prompt handling", () => {
     const dir = await mkdtemp(join(tmpdir(), "bridge-workspace-"));
 
     try {
-      await expect(validateWorkspace(dir)).resolves.toBe(dir);
+      await expect(validateWorkspace(dir, [tmpdir()])).resolves.toBe(dir);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects existing workspaces outside allowed roots", async () => {
+    const { validateWorkspace } = await import("../src/jobs.js");
+    const dir = await mkdtemp(join(tmpdir(), "bridge-workspace-"));
+
+    try {
+      await expect(validateWorkspace(dir, [join(tmpdir(), "other-root")])).rejects.toThrow(
+        /workspace_not_allowed/
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

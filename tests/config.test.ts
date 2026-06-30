@@ -5,11 +5,17 @@ describe("configuration and secret boundaries", () => {
   it("reports OAuth configured when CLAUDE_CODE_OAUTH_TOKEN is present", () => {
     const config = loadConfig({
       CLAUDE_CODE_OAUTH_TOKEN: "oauth-secret",
-      PORT: "9999"
+      PORT: "9999",
+      HOST: "127.0.0.1",
+      BRIDGE_API_KEY: "bridge-secret",
+      CLAUDE_OAUTH_ALLOWED_WORKSPACES: "D:\\repos;D:\\work"
     });
 
     expect(config.oauthConfigured).toBe(true);
     expect(config.port).toBe(9999);
+    expect(config.host).toBe("127.0.0.1");
+    expect(config.bridgeApiKey).toBe("bridge-secret");
+    expect(config.allowedWorkspaceRoots).toEqual(["D:\\repos", "D:\\work"]);
   });
 
   it("reports OAuth missing when neither token nor local credential probe is present", () => {
@@ -25,6 +31,22 @@ describe("configuration and secret boundaries", () => {
     );
 
     expect(config.oauthConfigured).toBe(false);
+  });
+
+  it("defaults to loopback binding and bounded request sizes", () => {
+    const config = loadConfig({}, { hasLocalClaudeCredentials: () => false });
+
+    expect(config.host).toBe("127.0.0.1");
+    expect(config.maxRequestBytes).toBeGreaterThan(0);
+    expect(config.maxQueueSize).toBeGreaterThan(0);
+    expect(config.maxOutputBytes).toBeGreaterThan(0);
+    expect(config.allowedWorkspaceRoots).toContain(process.cwd());
+  });
+
+  it("rejects non-loopback binding unless bridge API key is configured", () => {
+    expect(() =>
+      loadConfig({ HOST: "0.0.0.0" }, { hasLocalClaudeCredentials: () => false })
+    ).toThrow(/bridge_api_key_required/);
   });
 
   it("redacts Claude and Anthropic credential values from logs", () => {

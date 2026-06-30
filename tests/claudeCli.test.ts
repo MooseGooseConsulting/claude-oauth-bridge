@@ -81,4 +81,33 @@ describe("Claude CLI backend", () => {
     expect(calls[0]?.args).toContain("--output-format");
     expect(calls[0]?.args).toContain("stream-json");
   });
+
+  it("rejects Claude output over the configured limit", async () => {
+    const fakeChild = new EventEmitter() as EventEmitter & {
+      stdout: Readable;
+      stderr: Readable;
+      kill: () => void;
+    };
+    fakeChild.stdout = Readable.from(["0123456789"]);
+    fakeChild.stderr = Readable.from([]);
+    fakeChild.kill = vi.fn();
+
+    const backend = new ClaudeCliBackend({
+      spawn() {
+        queueMicrotask(() => fakeChild.emit("close", 0));
+        return fakeChild as unknown as ChildProcess;
+      },
+      timeoutMs: 1_000,
+      maxOutputBytes: 4
+    });
+
+    await expect(
+      backend.complete({
+        model: "sonnet",
+        effort: "medium",
+        prompt: "Reply ok",
+        stream: false
+      })
+    ).rejects.toThrow(/claude_cli_output_too_large/);
+  });
 });

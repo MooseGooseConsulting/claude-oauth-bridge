@@ -6,7 +6,7 @@
   "description": "Local HTTP bridge exposing Claude Code OAuth-backed model endpoints.",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",

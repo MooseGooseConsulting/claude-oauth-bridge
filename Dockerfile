@@ -14,6 +14,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
+RUN npm install -g @anthropic-ai/claude-code@2.1.197
 COPY --from=build /app/dist ./dist
 EXPOSE 8787
 CMD ["node", "dist/src/index.js"]

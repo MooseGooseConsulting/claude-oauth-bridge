@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 import { HttpError } from "./errors.js";
 
@@ -63,8 +63,12 @@ export function parseJobResult(text: string): ParsedJobResult {
   };
 }
 
-export async function validateWorkspace(workspace: string): Promise<string> {
+export async function validateWorkspace(
+  workspace: string,
+  allowedRoots: string[] = [process.cwd()]
+): Promise<string> {
   const resolved = resolve(workspace);
+  const allowed = allowedRoots.map((root) => resolve(root));
 
   try {
     const info = await stat(resolved);
@@ -78,7 +82,16 @@ export async function validateWorkspace(workspace: string): Promise<string> {
     throw new HttpError(400, "workspace_not_found", `Workspace not found: ${workspace}`);
   }
 
+  if (!allowed.some((root) => isPathInside(resolved, root))) {
+    throw new HttpError(403, "workspace_not_allowed", `Workspace is not under an allowed root: ${workspace}`);
+  }
+
   return resolved;
+}
+
+function isPathInside(candidate: string, root: string): boolean {
+  const diff = relative(root, candidate);
+  return diff === "" || (diff.length > 0 && !diff.startsWith("..") && !isAbsolute(diff));
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

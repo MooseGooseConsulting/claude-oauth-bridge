@@ -36,10 +36,15 @@ Copy `.env.example` and set values in your process manager or shell.
 ```powershell
 $env:CLAUDE_CODE_OAUTH_TOKEN = "..."
 $env:PORT = "8787"
+$env:HOST = "127.0.0.1"
 npm run dev
 ```
 
 Do not set `ANTHROPIC_API_KEY` for this bridge path. If it exists in the parent environment, the bridge removes it before spawning Claude.
+
+`HOST` defaults to `127.0.0.1`. Binding to a non-loopback address requires `BRIDGE_API_KEY`; callers then need `Authorization: Bearer <BRIDGE_API_KEY>` or `X-Bridge-Api-Key`.
+
+Workspace job endpoints are restricted to `CLAUDE_OAUTH_ALLOWED_WORKSPACES`, a semicolon- or comma-separated list. If unset, only the bridge process working directory is allowed.
 
 ## Tool Calls
 
@@ -50,6 +55,8 @@ Tool-call translation should be added only after the Claude runtime event stream
 ## Jobs
 
 `/jobs/review` and `/jobs/fix` run Claude with `cwd` set to a validated existing workspace directory. Callers cannot pass arbitrary environment variables or shell commands.
+
+The Docker image installs the pinned Claude Code CLI package used by the `claude-cli` backend. You still need to provide OAuth configuration at runtime.
 
 ## Development
 

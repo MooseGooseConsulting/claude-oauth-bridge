@@ -50,6 +50,30 @@ describe("message normalization", () => {
     ).toThrow(/tool_use_not_supported/);
   });
 
+  it("fails loudly for non-text content blocks instead of silently dropping them", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "tool_result", content: "hidden context" }] as never
+          }
+        ]
+      })
+    ).toThrow(/content_block_not_supported/);
+  });
+
+  it("fails loudly when streaming is requested because streaming translation is not implemented", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        stream: true,
+        messages: [{ role: "user", content: "Hello" }]
+      })
+    ).toThrow(/streaming_not_supported/);
+  });
+
   it("normalizes OpenAI-compatible chat completions into the bridge request", () => {
     const request = normalizeChatCompletionRequest({
       model: "claude-oauth/sonnet",

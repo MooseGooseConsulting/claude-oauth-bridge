@@ -18,7 +18,8 @@ export interface BackendTextResult {
 
 type Role = "user" | "assistant" | "system";
 type TextBlock = { type: "text"; text: string };
-type MessageContent = string | TextBlock[];
+type ContentBlock = TextBlock | Record<string, unknown>;
+type MessageContent = string | ContentBlock[];
 
 interface RoleMessage {
   role: Role;
@@ -46,6 +47,7 @@ interface ChatCompletionRequest {
 
 export function normalizeMessagesRequest(request: MessagesRequest): InternalCompletionRequest {
   rejectTools(request.tools);
+  rejectStreaming(request.stream);
   const model = normalizeModel(request.model);
 
   return {
@@ -54,7 +56,7 @@ export function normalizeMessagesRequest(request: MessagesRequest): InternalComp
     prompt: messagesToPrompt(request.messages ?? []),
     maxTokens: request.max_tokens,
     temperature: request.temperature,
-    stream: request.stream ?? false
+    stream: false
   };
 }
 
@@ -62,6 +64,7 @@ export function normalizeChatCompletionRequest(
   request: ChatCompletionRequest
 ): InternalCompletionRequest {
   rejectTools(request.tools);
+  rejectStreaming(request.stream);
   const model = normalizeModel(request.model);
   const messages = request.messages ?? [];
   const system = messages
@@ -76,7 +79,7 @@ export function normalizeChatCompletionRequest(
     prompt: messagesToPrompt(messages.filter((message) => message.role !== "system")),
     maxTokens: request.max_tokens,
     temperature: request.temperature,
-    stream: request.stream ?? false
+    stream: false
   };
 }
 
@@ -130,6 +133,12 @@ function rejectTools(tools: unknown[] | undefined): void {
   }
 }
 
+function rejectStreaming(stream: boolean | undefined): void {
+  if (stream === true) {
+    throw new HttpError(400, "streaming_not_supported", "Streaming is not supported by this bridge");
+  }
+}
+
 function messagesToPrompt(messages: RoleMessage[]): string {
   return messages
     .map((message) => `${roleLabel(message.role)}: ${contentToText(message.content) ?? ""}`)
@@ -149,8 +158,17 @@ function contentToText(content: MessageContent | undefined): string | undefined 
     return content;
   }
 
-  return content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text)
-    .join("");
+  return content.map(contentBlockToText).join("");
+}
+
+function contentBlockToText(block: ContentBlock): string {
+  if (block.type !== "text" || typeof block.text !== "string") {
+    throw new HttpError(
+      400,
+      "content_block_not_supported",
+      "Only text content blocks are supported by this bridge"
+    );
+  }
+
+  return block.text;
 }
