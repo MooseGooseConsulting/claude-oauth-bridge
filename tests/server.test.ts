@@ -4,6 +4,19 @@ import type { AddressInfo } from "node:net";
 import { createBridgeServer } from "../src/server.js";
 import type { BridgeBackend } from "../src/backend/types.js";
 
+interface ModelListResponse {
+  data: Array<{ id: string }>;
+}
+
+interface MessageResponse {
+  model: string;
+  content: Array<{ text: string }>;
+}
+
+interface ChatCompletionResponse {
+  choices: Array<{ message: { content: string } }>;
+}
+
 const backend: BridgeBackend = {
   name: "mock",
   async complete(request) {
@@ -48,7 +61,7 @@ describe("bridge HTTP server", () => {
   it("lists bridge model ids", async () => {
     await withServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/v1/models`);
-      const body = await response.json();
+      const body = (await response.json()) as ModelListResponse;
 
       expect(body.data.map((model: { id: string }) => model.id)).toEqual([
         "claude-oauth/sonnet",
@@ -68,7 +81,7 @@ describe("bridge HTTP server", () => {
         })
       });
 
-      const body = await response.json();
+      const body = (await response.json()) as MessageResponse;
       expect(body.content[0].text).toContain("oauth-bridge-ok");
       expect(body.model).toBe("claude-oauth/sonnet");
     });
@@ -85,7 +98,7 @@ describe("bridge HTTP server", () => {
         })
       });
 
-      const body = await response.json();
+      const body = (await response.json()) as ChatCompletionResponse;
       expect(body.choices[0].message.content).toContain("chat-ok");
     });
   });
