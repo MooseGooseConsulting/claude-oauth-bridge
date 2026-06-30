@@ -7,6 +7,7 @@ import {
   toBridgeModelId
 } from "../src/adapters/mastra/claudeOauthGateway.js";
 import type { LanguageModelV2 } from "@ai-sdk/provider-v5";
+import { ModelRouterLanguageModel } from "@mastra/core/llm";
 
 describe("Claude OAuth Mastra gateway", () => {
   it("exposes the claude-oauth provider and bridge model ids", async () => {
@@ -18,7 +19,7 @@ describe("Claude OAuth Mastra gateway", () => {
     await expect(gateway.fetchProviders()).resolves.toEqual({
       "claude-oauth": {
         name: "Claude OAuth Bridge",
-        models: ["claude-oauth/sonnet", "claude-oauth/sonnet-high"],
+        models: ["sonnet", "sonnet-high"],
         apiKeyEnvVar: "CLAUDE_OAUTH_BRIDGE_API_KEY",
         gateway: "claude-oauth",
         url: "http://bridge.local:8787/v1"
@@ -58,6 +59,17 @@ describe("Claude OAuth Mastra gateway", () => {
     });
   });
 
+  it("requires the bridge API key unless callers explicitly provide one", async () => {
+    const gateway = new ClaudeOauthMastraGateway({
+      bridgeUrl: "http://localhost:8787",
+      env: {}
+    });
+
+    await expect(gateway.getApiKey("claude-oauth/sonnet")).rejects.toThrow(
+      /CLAUDE_OAUTH_BRIDGE_API_KEY/
+    );
+  });
+
   it("creates an AI SDK language model pointed at the bridge", async () => {
     const gateway = new ClaudeOauthMastraGateway({
       bridgeUrl: "http://localhost:8787",
@@ -71,6 +83,45 @@ describe("Claude OAuth Mastra gateway", () => {
 
     expect(model.provider).toBe("claude-oauth.chat");
     expect(model.modelId).toBe("claude-oauth/sonnet");
+  });
+
+  it("works through Mastra's ModelRouterLanguageModel using the gateway id shape", async () => {
+    const model = new ModelRouterLanguageModel("claude-oauth/claude-oauth/sonnet", [
+      new ClaudeOauthMastraGateway({
+        bridgeUrl: "http://localhost:8787",
+        bridgeApiKey: "bridge-secret",
+        customFetch: async () =>
+          new Response(
+            JSON.stringify({
+              id: "chatcmpl_mock",
+              object: "chat.completion",
+              created: 1,
+              model: "sonnet",
+              choices: [
+                {
+                  index: 0,
+                  message: { role: "assistant", content: "mastra-router-ok" },
+                  finish_reason: "stop"
+                }
+              ]
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+      })
+    ]);
+
+    const result = await model.doGenerate({
+      prompt: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "Reply exactly: mastra-router-ok" }]
+        }
+      ]
+    });
+
+    expect((result as unknown as { content: unknown }).content).toEqual([
+      { type: "text", text: "mastra-router-ok" }
+    ]);
   });
 
   it("creates a direct Mastra-compatible model for agents that do not use gateway registry", () => {
@@ -134,12 +185,14 @@ describe("Claude OAuth Mastra gateway", () => {
     expect(CLAUDE_OAUTH_MASTRA_MODELS).toEqual([
       {
         id: "claude-oauth/sonnet",
+        mastraModel: "sonnet",
         bridgeModel: "claude-oauth/sonnet",
         toolCalls: "unsupported",
         streaming: "unsupported"
       },
       {
         id: "claude-oauth/sonnet-high",
+        mastraModel: "sonnet-high",
         bridgeModel: "claude-oauth/sonnet-high",
         toolCalls: "unsupported",
         streaming: "unsupported"

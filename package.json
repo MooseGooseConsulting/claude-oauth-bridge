@@ -16,7 +16,6 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^3.0.2",
     "@ai-sdk/openai-compatible-v5": "npm:@ai-sdk/openai-compatible@^1.0.39",
     "@ai-sdk/provider-utils-v5": "npm:@ai-sdk/provider-utils@^3.0.25",
     "@mastra/core": "^1.47.0",

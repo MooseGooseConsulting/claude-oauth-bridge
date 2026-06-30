@@ -124,9 +124,14 @@ export const agent = new Agent({
   id: "bridge-agent",
   name: "Bridge Agent",
   instructions: "You answer through the local Claude OAuth bridge.",
-  model: "claude-oauth/sonnet"
+  model: "claude-oauth/claude-oauth/sonnet"
 });
 ```
+
+Mastra router model strings are `gateway/provider/model`, so the gateway form is:
+
+- `claude-oauth/claude-oauth/sonnet`
+- `claude-oauth/claude-oauth/sonnet-high`
 
 For simpler integrations, create the model directly:
 
@@ -138,6 +143,11 @@ const model = createClaudeOauthMastraModel("claude-oauth/sonnet", {
   bridgeApiKey: process.env.CLAUDE_OAUTH_BRIDGE_API_KEY
 });
 ```
+
+The direct factory accepts the bridge model ids:
+
+- `claude-oauth/sonnet`
+- `claude-oauth/sonnet-high`
 
 Mastra must not receive `CLAUDE_CODE_OAUTH_TOKEN`. The bridge owns Claude OAuth. The Mastra adapter only receives:
 

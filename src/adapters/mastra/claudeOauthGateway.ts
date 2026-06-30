@@ -13,6 +13,7 @@ export interface ClaudeOauthMastraGatewayOptions {
 
 export interface ClaudeOauthMastraModelInfo {
   id: ClaudeOauthMastraModelId;
+  mastraModel: "sonnet" | "sonnet-high";
   bridgeModel: ClaudeOauthMastraModelId;
   toolCalls: "unsupported";
   streaming: "unsupported";
@@ -21,12 +22,14 @@ export interface ClaudeOauthMastraModelInfo {
 export const CLAUDE_OAUTH_MASTRA_MODELS: ClaudeOauthMastraModelInfo[] = [
   {
     id: "claude-oauth/sonnet",
+    mastraModel: "sonnet",
     bridgeModel: "claude-oauth/sonnet",
     toolCalls: "unsupported",
     streaming: "unsupported"
   },
   {
     id: "claude-oauth/sonnet-high",
+    mastraModel: "sonnet-high",
     bridgeModel: "claude-oauth/sonnet-high",
     toolCalls: "unsupported",
     streaming: "unsupported"
@@ -60,7 +63,7 @@ export class ClaudeOauthMastraGateway extends MastraModelGateway {
     return {
       [PROVIDER_ID]: {
         name: PROVIDER_NAME,
-        models: CLAUDE_OAUTH_MASTRA_MODELS.map((model) => model.id),
+        models: CLAUDE_OAUTH_MASTRA_MODELS.map((model) => model.mastraModel),
         apiKeyEnvVar: BRIDGE_API_KEY_ENV,
         gateway: this.id,
         url: this.resolveBridgeBaseUrl()
@@ -73,7 +76,11 @@ export class ClaudeOauthMastraGateway extends MastraModelGateway {
   }
 
   async getApiKey(_modelId: string): Promise<string> {
-    return this.bridgeApiKey ?? this.env[BRIDGE_API_KEY_ENV] ?? "claude-oauth-bridge";
+    const apiKey = this.bridgeApiKey ?? this.env[BRIDGE_API_KEY_ENV];
+    if (apiKey === undefined || apiKey.trim().length === 0) {
+      throw new Error(`Missing ${BRIDGE_API_KEY_ENV}. Set it to the bridge API key or disable bridge auth for local tests.`);
+    }
+    return apiKey;
   }
 
   override handlesModel(modelId: string): boolean {
@@ -127,8 +134,11 @@ export function createClaudeOauthMastraModel(
   const apiKey =
     options.bridgeApiKey ??
     options.env?.[BRIDGE_API_KEY_ENV] ??
-    process.env[BRIDGE_API_KEY_ENV] ??
-    "claude-oauth-bridge";
+    process.env[BRIDGE_API_KEY_ENV];
+
+  if (apiKey === undefined || apiKey.trim().length === 0) {
+    throw new Error(`Missing ${BRIDGE_API_KEY_ENV}. Set it to the bridge API key or disable bridge auth for local tests.`);
+  }
 
   return createOpenAICompatible({
     name: PROVIDER_ID,
