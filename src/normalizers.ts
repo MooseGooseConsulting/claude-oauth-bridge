@@ -7,8 +7,6 @@ export interface InternalCompletionRequest {
   effort: ReasoningEffort;
   system?: string;
   prompt: string;
-  maxTokens?: number;
-  temperature?: number;
   stream: boolean;
 }
 
@@ -56,8 +54,6 @@ export function normalizeMessagesRequest(request: MessagesRequest): InternalComp
     ...model,
     system: contentToText(request.system),
     prompt: messagesToPrompt(request.messages ?? []),
-    maxTokens: request.max_tokens,
-    temperature: request.temperature,
     stream: false
   };
 }
@@ -80,8 +76,6 @@ export function normalizeChatCompletionRequest(
     ...model,
     system: system.length > 0 ? system : undefined,
     prompt: messagesToPrompt(messages.filter((message) => message.role !== "system")),
-    maxTokens: request.max_tokens,
-    temperature: request.temperature,
     stream: false
   };
 }

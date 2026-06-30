@@ -5,8 +5,6 @@ export interface BackendCompleteRequest {
   effort: ReasoningEffort;
   prompt: string;
   system?: string;
-  maxTokens?: number;
-  temperature?: number;
   stream: boolean;
   cwd?: string;
 }

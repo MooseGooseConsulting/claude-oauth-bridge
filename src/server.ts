@@ -93,8 +93,6 @@ async function handleRequest(
       effort: normalized.effort,
       prompt: normalized.prompt,
       system: normalized.system,
-      maxTokens: normalized.maxTokens,
-      temperature: normalized.temperature,
       stream: normalized.stream
     });
 
@@ -113,8 +111,6 @@ async function handleRequest(
       effort: normalized.effort,
       prompt: normalized.prompt,
       system: normalized.system,
-      maxTokens: normalized.maxTokens,
-      temperature: normalized.temperature,
       stream: normalized.stream
     });
 
