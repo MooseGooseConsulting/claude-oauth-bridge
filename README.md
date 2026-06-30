@@ -44,6 +44,8 @@ Do not set `ANTHROPIC_API_KEY` for this bridge path. If it exists in the parent 
 
 `HOST` defaults to `127.0.0.1`. Binding to a non-loopback address requires `BRIDGE_API_KEY`; callers then need `Authorization: Bearer <BRIDGE_API_KEY>` or `X-Bridge-Api-Key`.
 
+If `BRIDGE_API_KEY` is unset, the bridge generates an ephemeral key at startup. Set `BRIDGE_AUTH_DISABLED=1` only for explicitly trusted loopback-only test runs.
+
 Workspace job endpoints are restricted to `CLAUDE_OAUTH_ALLOWED_WORKSPACES`, a semicolon- or comma-separated list. If unset, only the bridge process working directory is allowed.
 
 ## Tool Calls

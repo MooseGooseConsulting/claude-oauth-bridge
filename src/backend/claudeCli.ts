@@ -58,6 +58,8 @@ export class ClaudeCliBackend implements BridgeBackend {
       let settled = false;
       const stdout = collectStream(child.stdout, this.maxOutputBytes);
       const stderr = collectStream(child.stderr, this.maxOutputBytes);
+      const guardedStdout = killOnOutputOverflow(stdout, child);
+      const guardedStderr = killOnOutputOverflow(stderr, child);
 
       const timer = setTimeout(() => {
         if (settled) {
@@ -82,7 +84,7 @@ export class ClaudeCliBackend implements BridgeBackend {
         }
         settled = true;
         clearTimeout(timer);
-        void Promise.all([stdout, stderr])
+        void Promise.all([guardedStdout, guardedStderr])
           .then(([stdoutText, stderrText]) => {
             if (code !== 0) {
               reject(new Error(`claude_cli_failed:${code}:${stderrText.trim()}`));
@@ -93,6 +95,17 @@ export class ClaudeCliBackend implements BridgeBackend {
           .catch(reject);
       });
     });
+  }
+}
+
+async function killOnOutputOverflow(promise: Promise<string>, child: ChildProcess): Promise<string> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (error instanceof Error && error.message === "claude_cli_output_too_large") {
+      child.kill();
+    }
+    throw error;
   }
 }
 

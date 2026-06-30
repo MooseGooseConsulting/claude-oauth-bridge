@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 export interface BridgeConfig {
   backend: "claude-cli";
   oauthConfigured: boolean;
@@ -31,7 +33,15 @@ export function loadConfig(
   probe?: CredentialProbe
 ): BridgeConfig {
   const host = hasText(env.HOST) ? env.HOST.trim() : DEFAULT_HOST;
-  const bridgeApiKey = hasText(env.BRIDGE_API_KEY) ? env.BRIDGE_API_KEY : undefined;
+  const authDisabled = env.BRIDGE_AUTH_DISABLED === "1" || env.BRIDGE_AUTH_DISABLED === "true";
+  const explicitBridgeApiKey = hasText(env.BRIDGE_API_KEY) ? env.BRIDGE_API_KEY : undefined;
+  if (!isLoopbackHost(host) && explicitBridgeApiKey === undefined) {
+    throw new Error("bridge_api_key_required: BRIDGE_API_KEY is required when HOST is not loopback");
+  }
+
+  const bridgeApiKey = authDisabled
+    ? undefined
+    : explicitBridgeApiKey ?? randomBytes(32).toString("hex");
   if (!isLoopbackHost(host) && bridgeApiKey === undefined) {
     throw new Error("bridge_api_key_required: BRIDGE_API_KEY is required when HOST is not loopback");
   }

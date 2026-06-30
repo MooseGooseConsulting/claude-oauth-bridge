@@ -44,6 +44,7 @@ async function withServer<T>(
       maxRequestBytes: 1024,
       maxOutputBytes: 1024 * 1024,
       allowedWorkspaceRoots: [process.cwd()],
+      bridgeApiKey: undefined,
       ...overrides
     },
     logger
@@ -174,6 +175,24 @@ describe("bridge HTTP server", () => {
           })
         });
         expect(authorized.status).toBe(200);
+      },
+      { bridgeApiKey: "bridge-secret" }
+    );
+  });
+
+  it("rejects text/plain POSTs when bridge auth is required", async () => {
+    await withServer(
+      async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/v1/messages`, {
+          method: "POST",
+          headers: { "content-type": "text/plain" },
+          body: JSON.stringify({
+            model: "claude-oauth/sonnet",
+            messages: [{ role: "user", content: "Hello" }]
+          })
+        });
+
+        expect(response.status).toBe(401);
       },
       { bridgeApiKey: "bridge-secret" }
     );

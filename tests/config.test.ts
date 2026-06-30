@@ -37,6 +37,8 @@ describe("configuration and secret boundaries", () => {
     const config = loadConfig({}, { hasLocalClaudeCredentials: () => false });
 
     expect(config.host).toBe("127.0.0.1");
+    expect(config.bridgeApiKey).toBeDefined();
+    expect(config.bridgeApiKey).not.toHaveLength(0);
     expect(config.maxRequestBytes).toBeGreaterThan(0);
     expect(config.maxQueueSize).toBeGreaterThan(0);
     expect(config.maxOutputBytes).toBeGreaterThan(0);
@@ -47,6 +49,15 @@ describe("configuration and secret boundaries", () => {
     expect(() =>
       loadConfig({ HOST: "0.0.0.0" }, { hasLocalClaudeCredentials: () => false })
     ).toThrow(/bridge_api_key_required/);
+  });
+
+  it("allows explicit opt-out of bridge auth only on loopback", () => {
+    const config = loadConfig(
+      { BRIDGE_AUTH_DISABLED: "1", HOST: "127.0.0.1" },
+      { hasLocalClaudeCredentials: () => false }
+    );
+
+    expect(config.bridgeApiKey).toBeUndefined();
   });
 
   it("redacts Claude and Anthropic credential values from logs", () => {

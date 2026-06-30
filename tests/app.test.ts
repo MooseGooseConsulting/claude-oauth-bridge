@@ -13,6 +13,20 @@ describe("bridge app wiring", () => {
     expect(backend.name).toBe("claude-cli");
     expect(config.port).toBe(9911);
     expect(config.host).toBe("127.0.0.1");
+    expect(config.bridgeApiKey).toBeDefined();
     expect(config.oauthConfigured).toBe(true);
+  });
+
+  it("wires production request logging", () => {
+    const events: unknown[] = [];
+    const { server } = createBridgeApp({
+      env: {
+        BRIDGE_AUTH_DISABLED: "1"
+      },
+      logger: (event) => events.push(event)
+    });
+
+    expect(server.listening).toBe(false);
+    expect(events).toEqual([]);
   });
 });

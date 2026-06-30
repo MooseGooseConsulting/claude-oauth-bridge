@@ -9,6 +9,7 @@ export interface CreateBridgeAppOptions {
   env?: ConfigEnv;
   probe?: CredentialProbe;
   backendOptions?: Omit<ClaudeCliBackendOptions, "env" | "timeoutMs">;
+  logger?: (event: Record<string, unknown>) => void;
 }
 
 export interface BridgeApp {
@@ -26,7 +27,15 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): BridgeApp
     timeoutMs: config.requestTimeoutMs,
     maxOutputBytes: config.maxOutputBytes
   });
-  const server = createBridgeServer({ backend, config });
+  const server = createBridgeServer({
+    backend,
+    config,
+    logger: options.logger ?? defaultLogger
+  });
 
   return { server, backend, config };
+}
+
+function defaultLogger(event: Record<string, unknown>): void {
+  process.stdout.write(`${JSON.stringify({ level: "info", ...event })}\n`);
 }

@@ -109,5 +109,6 @@ describe("Claude CLI backend", () => {
         stream: false
       })
     ).rejects.toThrow(/claude_cli_output_too_large/);
+    expect(fakeChild.kill).toHaveBeenCalled();
   });
 });
