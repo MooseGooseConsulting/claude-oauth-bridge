@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -74,6 +74,24 @@ describe("job prompt handling", () => {
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects symlinked workspaces that resolve outside allowed roots", async () => {
+    const { validateWorkspace } = await import("../src/jobs.js");
+    const allowedRoot = await mkdtemp(join(tmpdir(), "bridge-allowed-"));
+    const outsideRoot = await mkdtemp(join(tmpdir(), "bridge-outside-"));
+    const linkedWorkspace = join(allowedRoot, "linked-outside");
+
+    try {
+      await symlink(outsideRoot, linkedWorkspace, "junction");
+
+      await expect(validateWorkspace(linkedWorkspace, [allowedRoot])).rejects.toThrow(
+        /workspace_not_allowed/
+      );
+    } finally {
+      await rm(allowedRoot, { recursive: true, force: true });
+      await rm(outsideRoot, { recursive: true, force: true });
     }
   });
 });

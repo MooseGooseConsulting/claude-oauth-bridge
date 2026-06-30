@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { HttpError } from "./errors.js";
@@ -68,7 +68,6 @@ export async function validateWorkspace(
   allowedRoots: string[] = [process.cwd()]
 ): Promise<string> {
   const resolved = resolve(workspace);
-  const allowed = allowedRoots.map((root) => resolve(root));
 
   try {
     const info = await stat(resolved);
@@ -82,11 +81,23 @@ export async function validateWorkspace(
     throw new HttpError(400, "workspace_not_found", `Workspace not found: ${workspace}`);
   }
 
-  if (!allowed.some((root) => isPathInside(resolved, root))) {
+  const realWorkspace = await realpath(resolved);
+  const allowed = await Promise.all(allowedRoots.map(canonicalizeAllowedRoot));
+
+  if (!allowed.some((root) => isPathInside(realWorkspace, root))) {
     throw new HttpError(403, "workspace_not_allowed", `Workspace is not under an allowed root: ${workspace}`);
   }
 
-  return resolved;
+  return realWorkspace;
+}
+
+async function canonicalizeAllowedRoot(root: string): Promise<string> {
+  const resolved = resolve(root);
+  try {
+    return await realpath(resolved);
+  } catch {
+    return resolved;
+  }
 }
 
 function isPathInside(candidate: string, root: string): boolean {
