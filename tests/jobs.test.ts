@@ -45,6 +45,13 @@ describe("job prompt handling", () => {
     expect(result).toEqual({ summary: "plain output", rawText: "plain output" });
   });
 
+  it("falls back to raw text when structured job JSON is missing summary", () => {
+    const text = '{"changedFiles":[]}';
+    const result = parseJobResult(text);
+
+    expect(result).toEqual({ summary: text, rawText: text });
+  });
+
   it("rejects non-existent workspaces for jobs", async () => {
     const { validateWorkspace } = await import("../src/jobs.js");
 

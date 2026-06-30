@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
 import type { ChildProcess } from "node:child_process";
 
-import { ClaudeCliBackend, parseClaudeStreamJson } from "../src/backend/claudeCli.js";
+import { ClaudeCliBackend, collectStream, parseClaudeStreamJson } from "../src/backend/claudeCli.js";
 
 describe("Claude CLI backend", () => {
   it("parses stream-json assistant text events", () => {
@@ -110,6 +110,12 @@ describe("Claude CLI backend", () => {
       })
     ).rejects.toThrow(/claude_cli_output_too_large/);
     expect(fakeChild.kill).toHaveBeenCalled();
+  });
+
+  it("collects stream chunks up to the byte limit", async () => {
+    const text = await collectStream(Readable.from(["hello", " world"]), 11);
+
+    expect(text).toBe("hello world");
   });
 
   it("redacts stderr from failed CLI errors", async () => {

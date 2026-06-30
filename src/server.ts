@@ -60,7 +60,12 @@ async function handleRequest(
   requestId: string
 ): Promise<void> {
   const url = new URL(request.url ?? "/", "http://localhost");
-  authenticate(request, config, url.pathname);
+  try {
+    authenticate(request, config, url.pathname);
+  } catch (error) {
+    drainRequestBody(request);
+    throw error;
+  }
 
   if (request.method === "GET" && url.pathname === "/health") {
     writeJson(response, 200, {
@@ -205,8 +210,11 @@ function normalizeFixJob(body: Record<string, unknown>): FixJobRequest {
 }
 
 function requireString(value: unknown, field: string): string {
-  if (typeof value === "string" && value.trim().length > 0) {
-    return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
   }
 
   throw new HttpError(400, "invalid_request", `${field} is required`);
@@ -290,6 +298,14 @@ function headerHasValue(value: string | string[] | undefined, expected: string):
     ?.split(",")
     .map((entry) => entry.trim())
     .includes(expected) ?? false;
+}
+
+function drainRequestBody(request: IncomingMessage): void {
+  if (request.readableEnded || request.destroyed) {
+    return;
+  }
+
+  request.resume();
 }
 
 function createRequestId(): string {

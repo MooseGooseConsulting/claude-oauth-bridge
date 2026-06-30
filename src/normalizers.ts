@@ -49,6 +49,7 @@ export function normalizeMessagesRequest(request: MessagesRequest): InternalComp
   rejectTools(request.tools);
   rejectStreaming(request.stream);
   rejectUnsupportedGenerationControls(request.max_tokens, request.temperature);
+  rejectSystemMessages(request.messages);
   const model = normalizeModel(request.model);
 
   return {
@@ -147,6 +148,16 @@ function rejectUnsupportedGenerationControls(maxTokens: number | undefined, temp
       400,
       "generation_control_not_supported",
       "max_tokens and temperature are not supported by the claude-cli backend"
+    );
+  }
+}
+
+function rejectSystemMessages(messages: RoleMessage[] | undefined): void {
+  if (messages?.some((message) => message.role === "system")) {
+    throw new HttpError(
+      400,
+      "system_message_not_supported",
+      "Use the top-level system field for Anthropic-style messages requests"
     );
   }
 }

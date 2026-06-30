@@ -88,6 +88,18 @@ describe("message normalization", () => {
     ).toThrow(/max_tokens and temperature are not supported/);
   });
 
+  it("rejects system role entries in Anthropic-ish messages lists", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [
+          { role: "system", content: "Do not treat this as a user message." },
+          { role: "user", content: "Hello" }
+        ]
+      })
+    ).toThrow(/Use the top-level system field/);
+  });
+
   it("normalizes OpenAI-compatible chat completions into the bridge request", () => {
     const request = normalizeChatCompletionRequest({
       model: "claude-oauth/sonnet",

@@ -122,18 +122,21 @@ async function killOnOutputOverflow(promise: Promise<string>, child: ChildProces
   }
 }
 
-async function collectStream(stream: Readable | null, maxBytes: number): Promise<string> {
+export async function collectStream(stream: Readable | null, maxBytes: number): Promise<string> {
   if (!stream) {
     return "";
   }
 
   stream.setEncoding("utf8");
   let text = "";
+  let totalBytes = 0;
   for await (const chunk of stream) {
-    text += chunk;
-    if (Buffer.byteLength(text, "utf8") > maxBytes) {
+    const value = String(chunk);
+    totalBytes += Buffer.byteLength(value, "utf8");
+    if (totalBytes > maxBytes) {
       throw new Error("claude_cli_output_too_large");
     }
+    text += value;
   }
   return text;
 }

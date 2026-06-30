@@ -220,6 +220,24 @@ describe("bridge HTTP server", () => {
     );
   });
 
+  it("destroys unauthorized POST bodies when auth fails before reading JSON", async () => {
+    await withServer(
+      async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/v1/messages`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-oauth/sonnet",
+            messages: [{ role: "user", content: "x".repeat(200) }]
+          })
+        });
+
+        expect(response.status).toBe(401);
+      },
+      { bridgeApiKey: "bridge-secret" }
+    );
+  });
+
   it("rejects request bodies over the configured limit", async () => {
     await withServer(
       async (baseUrl) => {
@@ -313,5 +331,55 @@ describe("bridge HTTP server", () => {
         error: { code: "tool_use_not_supported" }
       });
     });
+  });
+
+  it("trims validated job string fields before building prompts", async () => {
+    const calls: string[] = [];
+    const trimBackend: BridgeBackend = {
+      name: "mock",
+      async complete(request) {
+        calls.push(request.prompt);
+        return { text: '{"summary":"ok"}' };
+      }
+    };
+    const server = createBridgeServer({
+      backend: trimBackend,
+      config: {
+        backend: "claude-cli",
+        oauthConfigured: true,
+        port: 0,
+        host: "127.0.0.1",
+        requestTimeoutMs: 30_000,
+        concurrency: 2,
+        maxQueueSize: 4,
+        maxRequestBytes: 1024,
+        maxOutputBytes: 1024 * 1024,
+        allowedWorkspaceRoots: [process.cwd()],
+        bridgeApiKey: undefined
+      }
+    });
+    server.listen(0);
+    await once(server, "listening");
+    const { port } = server.address() as AddressInfo;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/jobs/review`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspace: ` ${process.cwd()} `,
+          repoFullName: " owner/repo ",
+          prNumber: 1
+        })
+      });
+
+      expect(response.status).toBe(200);
+      expect(calls[0]).toContain("repository owner/repo");
+      expect(calls[0]).not.toContain("repository  owner/repo");
+      expect(calls[0]).not.toContain("owner/repo  at workspace");
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
   });
 });

@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import { ClaudeCliBackend, type ClaudeCliBackendOptions } from "./backend/claudeCli.js";
 import type { BridgeBackend } from "./backend/types.js";
 import { loadConfig, type BridgeConfig, type ConfigEnv, type CredentialProbe } from "./config.js";
+import { redactSecrets } from "./redaction.js";
 import { createBridgeServer } from "./server.js";
 
 export interface CreateBridgeAppOptions {
@@ -39,4 +40,3 @@ export function createBridgeApp(options: CreateBridgeAppOptions = {}): BridgeApp
 function defaultLogger(event: Record<string, unknown>): void {
   process.stdout.write(`${JSON.stringify(redactSecrets({ level: "info", ...event }))}\n`);
 }
-import { redactSecrets } from "./redaction.js";

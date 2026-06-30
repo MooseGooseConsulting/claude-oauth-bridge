@@ -50,7 +50,7 @@ export function parseJobResult(text: string): ParsedJobResult {
 
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    if (isObject(parsed)) {
+    if (isObject(parsed) && typeof parsed.summary === "string") {
       return parsed as ParsedJobResult;
     }
   } catch {
