@@ -161,3 +161,54 @@ Current limitations:
 - Tool calls are rejected with `tool_use_not_supported`.
 - Streaming is rejected with `streaming_not_supported`.
 - Structured output should be handled by Mastra-side parsing or a later bridge capability PR.
+
+## Hermes Adapter
+
+Hermes can use the bridge through its custom-provider OpenAI-compatible endpoint support. The helper lives at `src/adapters/hermes/claudeOauthBridge.ts`.
+
+Example Hermes custom provider:
+
+```yaml
+custom_providers:
+  - name: "claude-oauth-bridge"
+    base_url: "http://localhost:8080/v1"
+    key_env: "CLAUDE_OAUTH_BRIDGE_API_KEY"
+    api_mode: "openai"
+    model: "claude-oauth/sonnet"
+    models:
+      claude-oauth/sonnet:
+        context_length: 200000
+      claude-oauth/sonnet-high:
+        context_length: 200000
+```
+
+Equivalent TypeScript helper:
+
+```ts
+import { buildHermesCustomProvider } from "./src/adapters/hermes/claudeOauthBridge.js";
+
+const provider = buildHermesCustomProvider({
+  bridgeUrl: process.env.CLAUDE_OAUTH_BRIDGE_URL,
+  apiKeyEnv: "CLAUDE_OAUTH_BRIDGE_API_KEY"
+});
+```
+
+Hermes provider id:
+
+- `claude-oauth-bridge`
+
+Hermes model ids:
+
+- `claude-oauth/sonnet`
+- `claude-oauth/sonnet-high`
+
+Hermes must not receive `CLAUDE_CODE_OAUTH_TOKEN`. The bridge owns Claude OAuth. Hermes only needs:
+
+- `CLAUDE_OAUTH_BRIDGE_URL`, for example `http://localhost:8080`
+- `CLAUDE_OAUTH_BRIDGE_API_KEY`, if bridge auth is enabled
+
+Current limitations:
+
+- Hermes tool calls are disabled for this provider path until the bridge implements tool-call translation.
+- Streaming is disabled for the helper path until the bridge implements streaming translation.
+- Hermes memory and tools remain Hermes-owned; the bridge is model-only for this adapter path.
