@@ -259,3 +259,48 @@ Current limitations:
 - Native Letta tool calls are disabled for this provider path until the bridge implements tool-call translation.
 - Streaming is disabled for the helper path until the bridge implements streaming translation.
 - Structured output should remain a Letta-side concern unless a later bridge capability adds explicit structured-output normalization.
+
+## Repo Automation Runner
+
+The runner helpers live under `src/runner/`. They implement the webhook-triggered shape for repo automation while keeping Claude OAuth isolated in the bridge:
+
+```text
+GitHub webhook
+  -> task router
+  -> file-backed queue
+  -> worker job plan
+  -> full repo clone
+  -> framework config: mastra | hermes | letta
+  -> framework calls claude-oauth-bridge
+  -> tests/lint
+  -> PR/review/comment artifact or publishing command
+```
+
+Implemented job kinds:
+
+- `review-pr`
+- `fix-issue`
+- `research-and-patch`
+
+Security boundaries:
+
+- GitHub webhooks are verified with `X-Hub-Signature-256` HMAC SHA-256.
+- Fork pull requests are rejected by default.
+- Workspace-relative paths reject traversal and absolute paths.
+- Shell commands are constrained to a small allowlist for discovery and publishing.
+- Docker, kubectl, cloud CLIs, and arbitrary shell execution are not allowlisted.
+- Runner framework config uses only `CLAUDE_OAUTH_BRIDGE_URL` and optional `CLAUDE_OAUTH_BRIDGE_API_KEY`.
+- `CLAUDE_CODE_OAUTH_TOKEN` must remain only in the bridge process and its Claude runtime.
+
+Local mock run:
+
+```powershell
+npm run runner:mock -- --workspace .runner-workspaces --kind fix-issue --repo owner/repo --issue 99 --framework mastra
+```
+
+The mock run writes a branch name and `PR_BODY.md` artifact without publishing to GitHub. Real publishing should use the generated job plan commands:
+
+- `gh pr review`
+- `gh pr comment`
+- `gh pr create`
+- `gh issue comment`
