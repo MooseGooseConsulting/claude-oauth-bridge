@@ -171,7 +171,7 @@ Example Hermes custom provider:
 ```yaml
 custom_providers:
   - name: "claude-oauth-bridge"
-    base_url: "http://localhost:8080/v1"
+    base_url: "http://localhost:8787/v1"
     key_env: "CLAUDE_OAUTH_BRIDGE_API_KEY"
     api_mode: "openai"
     model: "claude-oauth/sonnet"
@@ -204,7 +204,7 @@ Hermes model ids:
 
 Hermes must not receive `CLAUDE_CODE_OAUTH_TOKEN`. The bridge owns Claude OAuth. Hermes only needs:
 
-- `CLAUDE_OAUTH_BRIDGE_URL`, for example `http://localhost:8080`
+- `CLAUDE_OAUTH_BRIDGE_URL`, for example `http://localhost:8787`
 - `CLAUDE_OAUTH_BRIDGE_API_KEY`, if bridge auth is enabled
 
 Current limitations:
@@ -212,3 +212,50 @@ Current limitations:
 - Hermes tool calls are disabled for this provider path until the bridge implements tool-call translation.
 - Streaming is disabled for the helper path until the bridge implements streaming translation.
 - Hermes memory and tools remain Hermes-owned; the bridge is model-only for this adapter path.
+
+## Letta Adapter
+
+Letta can use the bridge through an OpenAI-compatible custom endpoint path. The helper lives at `src/adapters/letta/claudeOauthBridge.ts`.
+
+Example integration config object:
+
+```ts
+import { buildLettaOpenAICompatibleConfig } from "./src/adapters/letta/claudeOauthBridge.js";
+
+const modelConfig = buildLettaOpenAICompatibleConfig({
+  bridgeUrl: process.env.CLAUDE_OAUTH_BRIDGE_URL,
+  apiKeyEnv: "CLAUDE_OAUTH_BRIDGE_API_KEY",
+  model: "claude-oauth/sonnet"
+});
+```
+
+The generated config is intentionally generic so it can be adapted to the Letta deployment surface in use:
+
+```json
+{
+  "provider": "claude-oauth-bridge",
+  "model": "claude-oauth/sonnet",
+  "baseUrl": "http://localhost:8787/v1",
+  "apiKeyEnv": "CLAUDE_OAUTH_BRIDGE_API_KEY",
+  "endpointType": "openai-compatible",
+  "toolCalls": false
+}
+```
+
+Letta model handles:
+
+- `claude-oauth/sonnet`
+- `claude-oauth/sonnet-high`
+
+Letta must not receive `CLAUDE_CODE_OAUTH_TOKEN`. The bridge owns Claude OAuth. Letta only needs:
+
+- `CLAUDE_OAUTH_BRIDGE_URL`, for example `http://localhost:8787`
+- `CLAUDE_OAUTH_BRIDGE_API_KEY`, if bridge auth is enabled
+
+Letta memory remains Letta-owned. The helper formats only the model request sent to the bridge and intentionally does not include Letta memory state in bridge payloads unless Letta itself renders memory into ordinary prompt messages.
+
+Current limitations:
+
+- Native Letta tool calls are disabled for this provider path until the bridge implements tool-call translation.
+- Streaming is disabled for the helper path until the bridge implements streaming translation.
+- Structured output should remain a Letta-side concern unless a later bridge capability adds explicit structured-output normalization.
