@@ -102,6 +102,22 @@ describe("message normalization", () => {
     ).toThrow(/Unsupported message role/);
   });
 
+  it("rejects missing per-message content instead of normalizing it to empty text", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [{ role: "user" } as never]
+      })
+    ).toThrow(/message content is required/);
+
+    expect(() =>
+      normalizeChatCompletionRequest({
+        model: "claude-oauth/sonnet",
+        messages: [{ role: "system" } as never]
+      })
+    ).toThrow(/message content is required/);
+  });
+
   it("normalizes OpenAI-compatible chat completions into the bridge request", () => {
     const request = normalizeChatCompletionRequest({
       model: "claude-oauth/sonnet",

@@ -66,8 +66,7 @@ export function normalizeChatCompletionRequest(
   const messages = request.messages ?? [];
   const system = messages
     .filter((message) => validatedRole(message.role) === "system")
-    .map((message) => contentToText(message.content))
-    .filter((text): text is string => text !== undefined)
+    .map((message) => messageContentToText(message.content))
     .join("\n\n");
 
   return {
@@ -147,7 +146,7 @@ function rejectSystemMessages(messages: RoleMessage[] | undefined): void {
 function messagesToPrompt(messages: RoleMessage[]): string {
   const normalized = messages.map((message) => ({
     role: validatedRole(message.role),
-    text: contentToText(message.content) ?? ""
+    text: messageContentToText(message.content)
   }));
   if (normalized.length === 1 && normalized[0]?.role === "user") {
     return normalized[0].text;
@@ -180,6 +179,15 @@ function contentToText(content: MessageContent | undefined): string | undefined 
   }
 
   return content.map(contentBlockToText).join("");
+}
+
+function messageContentToText(content: MessageContent | undefined): string {
+  const text = contentToText(content);
+  if (text === undefined) {
+    throw new HttpError(400, "invalid_request", "message content is required");
+  }
+
+  return text;
 }
 
 function contentBlockToText(block: ContentBlock): string {

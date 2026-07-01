@@ -19,6 +19,25 @@ describe("local Claude credential detection", () => {
     }
   });
 
+  it("trims configured credential directories before resolving paths", () => {
+    const root = mkdtempSync(join(tmpdir(), "claude-creds-"));
+    const claudeDir = join(root, ".claude");
+    const credentialsPath = join(claudeDir, ".credentials.json");
+    mkdirSync(claudeDir);
+    writeFileSync(credentialsPath, "{\"note\":\"present\"}");
+
+    try {
+      expect(
+        detectLocalClaudeCredentials({
+          env: { HOME: ` ${root} `, USERPROFILE: ` ${root} ` },
+          homeDir: ` ${root} `
+        })
+      ).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("does not treat a missing credentials file as configured", () => {
     const root = mkdtempSync(join(tmpdir(), "claude-creds-"));
 

@@ -1,4 +1,4 @@
-import { createBridgeApp } from "../src/app.js";
+import { createBridgeApp, formatLogEvent } from "../src/app.js";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -67,33 +67,20 @@ describe("bridge app wiring", () => {
     expect(events).toContainEqual(expect.objectContaining({ event: "request_completed", path: "/health" }));
   });
 
-  it("redacts secrets in default production logs", () => {
-    const writes: string[] = [];
-    const originalWrite = process.stdout.write;
+  it("redacts secrets in formatted production logs", () => {
     const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "oauth-secret";
-    process.stdout.write = ((chunk: string | Uint8Array) => {
-      writes.push(chunk.toString());
-      return true;
-    }) as typeof process.stdout.write;
 
     try {
-      const { server } = createBridgeApp({
-        env: {
-          BRIDGE_AUTH_DISABLED: "1"
-        }
+      const text = formatLogEvent({
+        event: "credential_test",
+        message: "oauth-secret"
       });
-      server.emit("request", { url: "/health", method: "GET", headers: {} }, {
-        statusCode: 200,
-        headersSent: false,
-        writeHead() {},
-        end() {}
-      });
+
+      expect(text).not.toContain("oauth-secret");
+      expect(text).toContain("[REDACTED]");
     } finally {
-      process.stdout.write = originalWrite;
       process.env.CLAUDE_CODE_OAUTH_TOKEN = previous;
     }
-
-    expect(writes.join("")).not.toContain("oauth-secret");
   });
 });

@@ -162,6 +162,7 @@ describe("bridge HTTP server", () => {
           })
         });
         expect(unauthorized.status).toBe(401);
+        expect(unauthorized.headers.get("connection")).toBe("close");
 
         const authorized = await fetch(`${baseUrl}/v1/messages`, {
           method: "POST",
@@ -232,6 +233,7 @@ describe("bridge HTTP server", () => {
       });
 
       expect(response.status).toBe(415);
+      expect(response.headers.get("connection")).toBe("close");
       await expect(response.json()).resolves.toMatchObject({
         error: { code: "unsupported_media_type" }
       });

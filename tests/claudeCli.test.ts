@@ -33,6 +33,23 @@ describe("Claude CLI backend", () => {
     expect(parseClaudeStreamJson(text)).toEqual({ text: "oauth-bridge-ok" });
   });
 
+  it("falls back to assistant text when the final result frame is empty", () => {
+    const text = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [{ type: "text", text: "assistant-ok" }]
+        }
+      }),
+      JSON.stringify({
+        type: "result",
+        result: ""
+      })
+    ].join("\n");
+
+    expect(parseClaudeStreamJson(text)).toEqual({ text: "assistant-ok" });
+  });
+
   it("rejects empty successful CLI output", () => {
     expect(() => parseClaudeStreamJson("")).toThrow(/claude_cli_empty_response/);
   });

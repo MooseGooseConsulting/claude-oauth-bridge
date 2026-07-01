@@ -19,12 +19,13 @@ export function detectLocalClaudeCredentials(options: LocalClaudeCredentialOptio
 
 function credentialPaths(env: ConfigEnv, fallbackHome: string): string[] {
   const paths = new Set<string>();
-  if (hasText(env.CLAUDE_CONFIG_DIR)) {
-    paths.add(join(env.CLAUDE_CONFIG_DIR, ".credentials.json"));
+  const configDir = trimPath(env.CLAUDE_CONFIG_DIR);
+  if (configDir !== undefined) {
+    paths.add(join(configDir, ".credentials.json"));
   }
 
-  for (const home of [env.HOME, env.USERPROFILE, fallbackHome]) {
-    if (hasText(home)) {
+  for (const home of [env.HOME, env.USERPROFILE, fallbackHome].map(trimPath)) {
+    if (home !== undefined) {
       paths.add(join(home, ".claude", ".credentials.json"));
     }
   }
@@ -43,4 +44,8 @@ function fileHasContent(path: string): boolean {
 
 function hasText(value: string | undefined): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function trimPath(value: string | undefined): string | undefined {
+  return hasText(value) ? value.trim() : undefined;
 }

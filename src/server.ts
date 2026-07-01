@@ -67,7 +67,7 @@ async function handleRequest(
   try {
     authenticate(request, config, url.pathname);
   } catch (error) {
-    drainRequestBody(request);
+    closeAfterResponse(response);
     throw error;
   }
 
@@ -90,7 +90,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/v1/messages") {
     ensureOauth(config);
-    ensureJsonContentType(request);
+    ensureJsonContentType(request, response);
     const body = (await readJson(request, config.maxRequestBytes)) as unknown as Parameters<typeof normalizeMessagesRequest>[0];
     const normalized = normalizeMessagesRequest(body);
     const result = await backend.complete({
@@ -108,7 +108,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/v1/chat/completions") {
     ensureOauth(config);
-    ensureJsonContentType(request);
+    ensureJsonContentType(request, response);
     const body = (await readJson(request, config.maxRequestBytes)) as unknown as Parameters<
       typeof normalizeChatCompletionRequest
     >[0];
@@ -128,7 +128,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/jobs/review") {
     ensureOauth(config);
-    ensureJsonContentType(request);
+    ensureJsonContentType(request, response);
     const body = await readJson(request, config.maxRequestBytes);
     const job = normalizeReviewJob(body);
     const workspace = await validateWorkspace(job.workspace, config.allowedWorkspaceRoots);
@@ -147,7 +147,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/jobs/fix") {
     ensureOauth(config);
-    ensureJsonContentType(request);
+    ensureJsonContentType(request, response);
     const body = await readJson(request, config.maxRequestBytes);
     const job = normalizeFixJob(body);
     const workspace = await validateWorkspace(job.workspace, config.allowedWorkspaceRoots);
@@ -267,13 +267,20 @@ function ensureOauth(config: BridgeConfig): void {
   }
 }
 
-function ensureJsonContentType(request: IncomingMessage): void {
+function ensureJsonContentType(request: IncomingMessage, response: ServerResponse): void {
   const contentType = request.headers["content-type"];
   const value = Array.isArray(contentType) ? contentType.join(",") : contentType;
   const mediaType = value?.toLowerCase().split(";")[0]?.trim();
   if (mediaType !== "application/json" && !mediaType?.endsWith("+json")) {
-    drainRequestBody(request);
+    closeAfterResponse(response);
     throw new HttpError(415, "unsupported_media_type", "Content-Type must be application/json");
+  }
+}
+
+function closeAfterResponse(response: ServerResponse): void {
+  response.shouldKeepAlive = false;
+  if (!response.headersSent) {
+    response.setHeader("connection", "close");
   }
 }
 
@@ -314,14 +321,6 @@ function headerHasValue(value: string | string[] | undefined, expected: string):
     ?.split(",")
     .map((entry) => entry.trim())
     .includes(expected) ?? false;
-}
-
-function drainRequestBody(request: IncomingMessage): void {
-  if (request.readableEnded || request.destroyed) {
-    return;
-  }
-
-  request.resume();
 }
 
 function createRequestId(): string {
