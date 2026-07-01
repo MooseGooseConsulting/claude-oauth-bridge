@@ -13,7 +13,7 @@ export function routeGitHubWebhook(
   const framework = options.framework ?? "mastra";
 
   if (event === "pull_request") {
-    const action = stringField(payload.action);
+    const action = stringField(payload.action, "action");
     if (!["opened", "synchronize", "reopened", "ready_for_review"].includes(action)) {
       throw new Error(`unsupported pull_request action: ${action}`);
     }
@@ -46,7 +46,10 @@ export function routeGitHubWebhook(
   }
 
   if (event === "issues") {
-    const action = stringField(payload.action);
+    const action = stringField(payload.action, "action");
+    if (!["opened", "reopened", "labeled"].includes(action)) {
+      throw new Error(`unsupported issues action: ${action}`);
+    }
     const repository = objectField(payload.repository, "repository");
     const issue = objectField(payload.issue, "issue");
     const label = isObject(payload.label) ? optionalString(payload.label.name) : undefined;

@@ -77,7 +77,7 @@ export function buildJobPlan(task: AutomationTask): JobPlan {
     discoveryCommands: [
       ["git", "status", "--short"],
       ["git", "diff"],
-      task.kind === "review-pr" ? ["gh", "pr", "view", String(task.prNumber)] : ["gh", "issue", "view", String(task.issueNumber ?? "")]
+      ...issueOrPrViewCommand(task)
     ],
     publishCommands: publishCommandsFor(task)
   };
@@ -85,7 +85,11 @@ export function buildJobPlan(task: AutomationTask): JobPlan {
 
 export async function runMockAutomationJob(options: MockAutomationJobOptions): Promise<MockAutomationJobResult> {
   const safeRepoDir = rejectPathTraversal(options.task.repoFullName.replace("/", "-"));
-  const workspace = join(options.workspaceRoot, safeRepoDir, options.task.id ?? "task");
+  const safeTaskDir = rejectPathTraversal(options.task.id ?? "task");
+  if (safeTaskDir.includes("/") || safeTaskDir.includes("\\")) {
+    throw new Error(`task id cannot contain path separators: ${options.task.id}`);
+  }
+  const workspace = join(options.workspaceRoot, safeRepoDir, safeTaskDir);
   await mkdir(workspace, { recursive: true });
 
   const branchName = branchNameForTask(options.task);
@@ -109,22 +113,32 @@ export async function runMockAutomationJob(options: MockAutomationJobOptions): P
 function publishCommandsFor(task: AutomationTask): string[][] {
   if (task.kind === "review-pr") {
     return [
-      ["gh", "pr", "review", String(task.prNumber), "--comment"],
-      ["gh", "pr", "comment", String(task.prNumber)]
+      ["gh", "pr", "review", String(task.prNumber), "--comment", "--body-file", "PR_BODY.md"],
+      ["gh", "pr", "comment", String(task.prNumber), "--body-file", "PR_BODY.md"]
     ];
   }
 
   if (task.kind === "fix-issue") {
     return [
       ["gh", "pr", "create", "--fill"],
-      ["gh", "issue", "comment", String(task.issueNumber)]
+      ["gh", "issue", "comment", String(task.issueNumber), "--body-file", "PR_BODY.md"]
     ];
   }
 
-  return [
-    ["gh", "pr", "create", "--fill"],
-    ["gh", "issue", "comment", String(task.issueNumber ?? "")]
-  ];
+  return task.issueNumber === undefined
+    ? [["gh", "pr", "create", "--fill"]]
+    : [
+        ["gh", "pr", "create", "--fill"],
+        ["gh", "issue", "comment", String(task.issueNumber), "--body-file", "PR_BODY.md"]
+      ];
+}
+
+function issueOrPrViewCommand(task: AutomationTask): string[][] {
+  if (task.kind === "review-pr") {
+    return [["gh", "pr", "view", String(task.prNumber)]];
+  }
+
+  return task.issueNumber === undefined ? [] : [["gh", "issue", "view", String(task.issueNumber)]];
 }
 
 function branchNameForTask(task: AutomationTask): string {

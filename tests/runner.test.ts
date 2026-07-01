@@ -81,6 +81,19 @@ describe("repo automation runner", () => {
     expect(task).toMatchObject({ kind: "fix-issue", issueNumber: 44 });
   });
 
+  it("rejects unsupported issue actions", () => {
+    expect(() =>
+      routeGitHubWebhook("issues", {
+        action: "closed",
+        repository: {
+          full_name: "owner/repo",
+          clone_url: "https://github.com/owner/repo.git"
+        },
+        issue: { number: 44, title: "Done" }
+      })
+    ).toThrow(/unsupported issues action/);
+  });
+
   it("persists queued tasks durably on disk", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bridge-runner-queue-"));
     try {
@@ -98,6 +111,26 @@ describe("repo automation runner", () => {
       const id = await queue.enqueue(task);
       await expect(queue.read(id)).resolves.toMatchObject({ kind: "research-and-patch" });
       await expect(queue.dequeue()).resolves.toMatchObject({ id, task: { issueNumber: 7 } });
+      await expect(queue.dequeue()).resolves.toBeUndefined();
+      await queue.complete(id);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unsafe task ids before using them as queue filenames", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bridge-runner-queue-"));
+    try {
+      const queue = new FileTaskQueue(dir);
+      await expect(
+        queue.enqueue({
+          id: "../outside",
+          kind: "research-and-patch",
+          framework: "mastra",
+          repoFullName: "owner/repo",
+          cloneUrl: "https://github.com/owner/repo.git"
+        })
+      ).rejects.toThrow(/path traversal/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -116,21 +149,14 @@ describe("repo automation runner", () => {
     expect(isSafeShellCommand(["kubectl", "get", "pods"])).toBe(false);
   });
 
-  it("builds framework configs that point at the bridge without OAuth tokens", () => {
-    const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = "must-not-leak";
+  it("builds framework configs that point at the bridge without caller-owned secrets", () => {
+    const config = buildRunnerFrameworkConfig("hermes", {
+      bridgeUrl: "http://bridge:8080",
+      bridgeApiKeyEnv: "CLAUDE_OAUTH_BRIDGE_API_KEY"
+    });
 
-    try {
-      const config = buildRunnerFrameworkConfig("hermes", {
-        bridgeUrl: "http://bridge:8080",
-        bridgeApiKeyEnv: "CLAUDE_OAUTH_BRIDGE_API_KEY"
-      });
-
-      expect(JSON.stringify(config)).toContain("http://bridge:8080");
-      expect(JSON.stringify(config)).not.toContain("must-not-leak");
-    } finally {
-      process.env.CLAUDE_CODE_OAUTH_TOKEN = previous;
-    }
+    expect(JSON.stringify(config)).toContain("http://bridge:8080");
+    expect(JSON.stringify(config)).not.toContain("secret");
   });
 
   it("builds a job plan with full-clone setup and safe discovery commands", () => {
@@ -148,6 +174,20 @@ describe("repo automation runner", () => {
     expect(plan.checkout).toMatchObject({ mode: "branch", baseRef: "main" });
     expect(plan.discoveryCommands).toContainEqual(["git", "status", "--short"]);
     expect(plan.publishCommands).toContainEqual(["gh", "pr", "create", "--fill"]);
+    expect(plan.publishCommands).toContainEqual(["gh", "issue", "comment", "7", "--body-file", "PR_BODY.md"]);
+  });
+
+  it("omits issue commands for research-and-patch tasks without an issue number", () => {
+    const plan = buildJobPlan({
+      id: "task-research",
+      kind: "research-and-patch",
+      framework: "mastra",
+      repoFullName: "owner/repo",
+      cloneUrl: "https://github.com/owner/repo.git"
+    });
+
+    expect(plan.discoveryCommands).not.toContainEqual(["gh", "issue", "view", ""]);
+    expect(plan.publishCommands).not.toContainEqual(["gh", "issue", "comment", ""]);
   });
 
   it("local mock run creates a branch and PR body artifact", async () => {
@@ -170,6 +210,26 @@ describe("repo automation runner", () => {
       const body = await readFile(result.prBodyPath, "utf8");
       expect(body).toContain("owner/repo");
       expect(body).toContain("fix-issue");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unsafe task ids before using them as workspace path segments", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bridge-runner-work-"));
+    try {
+      await expect(
+        runMockAutomationJob({
+          workspaceRoot: dir,
+          task: {
+            id: "../outside",
+            kind: "research-and-patch",
+            framework: "mastra",
+            repoFullName: "owner/repo",
+            cloneUrl: "https://github.com/owner/repo.git"
+          }
+        })
+      ).rejects.toThrow(/path traversal/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
