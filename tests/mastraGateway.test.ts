@@ -47,7 +47,7 @@ describe("Claude OAuth Mastra gateway", () => {
     const gateway = new ClaudeOauthMastraGateway({
       bridgeUrl: "http://localhost:8787",
       env: {
-        CLAUDE_CODE_OAUTH_TOKEN: "must-not-read",
+        UNRELATED_CALLER_SECRET: "must-not-read",
         CLAUDE_OAUTH_BRIDGE_API_KEY: "bridge-secret"
       }
     });
