@@ -10,13 +10,12 @@ import {
 describe("Hermes claude-oauth-bridge adapter helpers", () => {
   it("builds a Hermes custom provider entry for the bridge", () => {
     const provider = buildHermesCustomProvider({
-      bridgeUrl: "http://localhost:8080/",
       apiKeyEnv: "CLAUDE_OAUTH_BRIDGE_API_KEY"
     });
 
     expect(provider).toEqual({
       name: "claude-oauth-bridge",
-      base_url: "http://localhost:8080/v1",
+      base_url: "http://localhost:8787/v1",
       key_env: "CLAUDE_OAUTH_BRIDGE_API_KEY",
       api_mode: "openai",
       model: "claude-oauth/sonnet",
@@ -30,6 +29,7 @@ describe("Hermes claude-oauth-bridge adapter helpers", () => {
   it("normalizes bridge URLs to the OpenAI-compatible /v1 base URL", () => {
     expect(normalizeHermesBridgeUrl("http://bridge:8080")).toBe("http://bridge:8080/v1");
     expect(normalizeHermesBridgeUrl("http://bridge:8080/v1")).toBe("http://bridge:8080/v1");
+    expect(normalizeHermesBridgeUrl("")).toBe("http://localhost:8787/v1");
   });
 
   it("maps and validates Hermes model ids", () => {
@@ -38,17 +38,13 @@ describe("Hermes claude-oauth-bridge adapter helpers", () => {
     expect(() => toHermesModelId("claude-3-5-sonnet")).toThrow(/Unsupported Hermes bridge model/);
   });
 
-  it("does not read Claude Code OAuth token from the Hermes process", () => {
-    const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = "must-not-be-read";
+  it("does not include caller-owned secrets in Hermes config", () => {
+    const provider = buildHermesCustomProvider({
+      bridgeUrl: "http://localhost:8787",
+      apiKeyEnv: "CLAUDE_OAUTH_BRIDGE_API_KEY"
+    });
 
-    try {
-      const provider = buildHermesCustomProvider({ bridgeUrl: "http://localhost:8080" });
-
-      expect(JSON.stringify(provider)).not.toContain("must-not-be-read");
-    } finally {
-      process.env.CLAUDE_CODE_OAUTH_TOKEN = previous;
-    }
+    expect(JSON.stringify(provider)).not.toContain("secret");
   });
 
   it("converts Hermes-style messages to an OpenAI-compatible bridge request", () => {
@@ -82,5 +78,15 @@ describe("Hermes claude-oauth-bridge adapter helpers", () => {
     expect(() => rejectUnsupportedHermesTools([{ name: "readFile" }])).toThrow(
       /Tool calls are not supported/
     );
+  });
+
+  it("fails loudly for streaming because bridge streaming translation is not implemented", () => {
+    expect(() =>
+      toHermesBridgeChatRequest({
+        model: "sonnet",
+        messages: [{ role: "user", content: "Hello" }],
+        stream: true
+      })
+    ).toThrow(/Streaming is not supported/);
   });
 });

@@ -55,7 +55,7 @@ interface OpenAICompatibleBridgeResponse {
 }
 
 const DEFAULT_CONTEXT_LENGTH = 200000;
-const DEFAULT_BRIDGE_URL = "http://localhost:8080";
+const DEFAULT_BRIDGE_URL = "http://localhost:8787";
 const DEFAULT_BRIDGE_KEY_ENV = "CLAUDE_OAUTH_BRIDGE_API_KEY";
 
 export function buildHermesCustomProvider(
@@ -66,7 +66,7 @@ export function buildHermesCustomProvider(
 
   return {
     name: HERMES_PROVIDER_ID,
-    base_url: normalizeHermesBridgeUrl(options.bridgeUrl ?? DEFAULT_BRIDGE_URL),
+    base_url: normalizeHermesBridgeUrl(options.bridgeUrl),
     key_env: options.apiKeyEnv ?? DEFAULT_BRIDGE_KEY_ENV,
     api_mode: "openai",
     model,
@@ -77,8 +77,8 @@ export function buildHermesCustomProvider(
   };
 }
 
-export function normalizeHermesBridgeUrl(bridgeUrl: string): string {
-  const trimmed = bridgeUrl.trim().replace(/\/+$/, "");
+export function normalizeHermesBridgeUrl(bridgeUrl: string | undefined): string {
+  const trimmed = (bridgeUrl?.trim() || DEFAULT_BRIDGE_URL).replace(/\/+$/, "");
   return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
 }
 
