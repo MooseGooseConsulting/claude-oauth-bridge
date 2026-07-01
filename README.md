@@ -48,6 +48,16 @@ If `BRIDGE_API_KEY` is unset, the bridge generates an ephemeral key at startup. 
 
 Workspace job endpoints are restricted to `CLAUDE_OAUTH_ALLOWED_WORKSPACES`, a semicolon- or comma-separated list. If unset, only the bridge process working directory is allowed.
 
+Resource limits:
+
+- `REQUEST_TIMEOUT_MS`, default `30000`
+- `CONCURRENCY`, default `2`
+- `MAX_QUEUE_SIZE`, default `16`
+- `MAX_REQUEST_BYTES`, default `1048576`
+- `MAX_OUTPUT_BYTES`, default `10485760`
+
+Docker deployments must set `HOST=0.0.0.0` if the bridge should be reachable outside the container. Non-loopback binding requires `BRIDGE_API_KEY`.
+
 ## Tool Calls
 
 `/v1/messages` currently supports text-only calls. If a request includes `tools`, the bridge returns `tool_use_not_supported` instead of pretending tool calls work.
@@ -73,6 +83,7 @@ Live Claude CLI verification is opt-in:
 
 ```powershell
 $env:RUN_LIVE_CLAUDE = "1"
+$env:CLAUDE_OAUTH_LIVE_READY = "1"
 $env:CLAUDE_CODE_OAUTH_TOKEN = "..."
 npm test -- tests/live.test.ts
 ```

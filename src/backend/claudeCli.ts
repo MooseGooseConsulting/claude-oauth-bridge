@@ -201,5 +201,9 @@ export function parseClaudeStreamJson(output: string): BackendCompleteResult {
   }
 
   const text = resultTexts.length > 0 ? resultTexts.join("") : assistantTexts.join("");
+  if (text.length === 0) {
+    throw new Error("claude_cli_empty_response");
+  }
+
   return { text };
 }

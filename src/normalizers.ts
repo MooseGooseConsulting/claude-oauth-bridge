@@ -20,7 +20,7 @@ type ContentBlock = TextBlock | Record<string, unknown>;
 type MessageContent = string | ContentBlock[];
 
 interface RoleMessage {
-  role: Role;
+  role: string;
   content: MessageContent;
 }
 
@@ -67,7 +67,7 @@ export function normalizeChatCompletionRequest(
   const model = normalizeModel(request.model);
   const messages = request.messages ?? [];
   const system = messages
-    .filter((message) => message.role === "system")
+    .filter((message) => validatedRole(message.role) === "system")
     .map((message) => contentToText(message.content))
     .filter((text): text is string => text !== undefined)
     .join("\n\n");
@@ -158,8 +158,16 @@ function rejectSystemMessages(messages: RoleMessage[] | undefined): void {
 
 function messagesToPrompt(messages: RoleMessage[]): string {
   return messages
-    .map((message) => `${roleLabel(message.role)}: ${contentToText(message.content) ?? ""}`)
+    .map((message) => `${roleLabel(validatedRole(message.role))}: ${contentToText(message.content) ?? ""}`)
     .join("\n\n");
+}
+
+function validatedRole(role: string): Role {
+  if (role === "user" || role === "assistant" || role === "system") {
+    return role;
+  }
+
+  throw new HttpError(400, "role_not_supported", `Unsupported message role: ${role}`);
 }
 
 function roleLabel(role: Role): string {

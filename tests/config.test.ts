@@ -60,6 +60,24 @@ describe("configuration and secret boundaries", () => {
     expect(config.bridgeApiKey).toBeUndefined();
   });
 
+  it("rejects bridge auth opt-out on non-loopback hosts", () => {
+    expect(() =>
+      loadConfig(
+        { BRIDGE_AUTH_DISABLED: "1", HOST: "0.0.0.0" },
+        { hasLocalClaudeCredentials: () => false }
+      )
+    ).toThrow(/bridge_api_key_required/);
+  });
+
+  it("falls back to the process cwd when allowed workspace parsing is empty", () => {
+    const config = loadConfig(
+      { CLAUDE_OAUTH_ALLOWED_WORKSPACES: "; , ;" },
+      { hasLocalClaudeCredentials: () => false }
+    );
+
+    expect(config.allowedWorkspaceRoots).toEqual([process.cwd()]);
+  });
+
   it("redacts Claude and Anthropic credential values from logs", () => {
     const previous = process.env.CLAUDE_CODE_OAUTH_TOKEN;
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "oauth-secret";

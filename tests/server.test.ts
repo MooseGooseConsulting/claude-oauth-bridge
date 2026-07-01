@@ -220,6 +220,38 @@ describe("bridge HTTP server", () => {
     );
   });
 
+  it("rejects non-JSON POST bodies before parsing", async () => {
+    await withServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: JSON.stringify({
+          model: "claude-oauth/sonnet",
+          messages: [{ role: "user", content: "Hello" }]
+        })
+      });
+
+      expect(response.status).toBe(415);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: "unsupported_media_type" }
+      });
+    });
+  });
+
+  it("isolates logger failures from request handling", async () => {
+    await withServer(
+      async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/health`);
+
+        expect(response.status).toBe(200);
+      },
+      {},
+      () => {
+        throw new Error("logger failed");
+      }
+    );
+  });
+
   it("destroys unauthorized POST bodies when auth fails before reading JSON", async () => {
     await withServer(
       async (baseUrl) => {

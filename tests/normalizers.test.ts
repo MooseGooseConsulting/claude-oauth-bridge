@@ -100,6 +100,15 @@ describe("message normalization", () => {
     ).toThrow(/Use the top-level system field/);
   });
 
+  it("rejects unsupported runtime message roles instead of treating them as user", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [{ role: "developer", content: "hidden" } as never]
+      })
+    ).toThrow(/Unsupported message role/);
+  });
+
   it("normalizes OpenAI-compatible chat completions into the bridge request", () => {
     const request = normalizeChatCompletionRequest({
       model: "claude-oauth/sonnet",

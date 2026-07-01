@@ -33,6 +33,10 @@ describe("Claude CLI backend", () => {
     expect(parseClaudeStreamJson(text)).toEqual({ text: "oauth-bridge-ok" });
   });
 
+  it("rejects empty successful CLI output", () => {
+    expect(() => parseClaudeStreamJson("")).toThrow(/claude_cli_empty_response/);
+  });
+
   it("removes Anthropic API-key env vars while preserving Claude OAuth", async () => {
     const calls: Array<{ command: string; args: string[]; env: NodeJS.ProcessEnv }> = [];
     const fakeChild = new EventEmitter() as EventEmitter & {

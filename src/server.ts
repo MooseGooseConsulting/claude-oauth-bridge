@@ -40,14 +40,18 @@ export function createBridgeServer({ backend, config, logger }: BridgeServerOpti
     }).catch((error: unknown) => {
       writeError(response, error, requestId);
     }).finally(() => {
-      logger?.({
-        event: "request_completed",
-        requestId,
-        method: request.method ?? "UNKNOWN",
-        path: url.pathname,
-        status: response.statusCode,
-        durationMs: Date.now() - startedAt
-      });
+      try {
+        logger?.({
+          event: "request_completed",
+          requestId,
+          method: request.method ?? "UNKNOWN",
+          path: url.pathname,
+          status: response.statusCode,
+          durationMs: Date.now() - startedAt
+        });
+      } catch {
+        // Logging must not affect request handling.
+      }
     });
   });
 }
@@ -86,6 +90,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/v1/messages") {
     ensureOauth(config);
+    ensureJsonContentType(request);
     const body = (await readJson(request, config.maxRequestBytes)) as unknown as Parameters<typeof normalizeMessagesRequest>[0];
     const normalized = normalizeMessagesRequest(body);
     const result = await backend.complete({
@@ -102,6 +107,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/v1/chat/completions") {
     ensureOauth(config);
+    ensureJsonContentType(request);
     const body = (await readJson(request, config.maxRequestBytes)) as unknown as Parameters<
       typeof normalizeChatCompletionRequest
     >[0];
@@ -120,6 +126,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/jobs/review") {
     ensureOauth(config);
+    ensureJsonContentType(request);
     const body = await readJson(request, config.maxRequestBytes);
     const job = normalizeReviewJob(body);
     const workspace = await validateWorkspace(job.workspace, config.allowedWorkspaceRoots);
@@ -138,6 +145,7 @@ async function handleRequest(
 
   if (request.method === "POST" && url.pathname === "/jobs/fix") {
     ensureOauth(config);
+    ensureJsonContentType(request);
     const body = await readJson(request, config.maxRequestBytes);
     const job = normalizeFixJob(body);
     const workspace = await validateWorkspace(job.workspace, config.allowedWorkspaceRoots);
@@ -254,6 +262,16 @@ function authenticate(request: IncomingMessage, config: BridgeConfig, path: stri
 function ensureOauth(config: BridgeConfig): void {
   if (!config.oauthConfigured) {
     throw new HttpError(503, "oauth_not_configured", "Claude OAuth is not configured");
+  }
+}
+
+function ensureJsonContentType(request: IncomingMessage): void {
+  const contentType = request.headers["content-type"];
+  const value = Array.isArray(contentType) ? contentType.join(",") : contentType;
+  const mediaType = value?.toLowerCase().split(";")[0]?.trim();
+  if (mediaType !== "application/json" && !mediaType?.endsWith("+json")) {
+    drainRequestBody(request);
+    throw new HttpError(415, "unsupported_media_type", "Content-Type must be application/json");
   }
 }
 

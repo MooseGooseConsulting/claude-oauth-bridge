@@ -9,7 +9,7 @@ import { createBridgeServer } from "./server.js";
 export interface CreateBridgeAppOptions {
   env?: ConfigEnv;
   probe?: CredentialProbe;
-  backendOptions?: Omit<ClaudeCliBackendOptions, "env" | "timeoutMs">;
+  backendOptions?: Omit<ClaudeCliBackendOptions, "env" | "timeoutMs" | "maxOutputBytes">;
   logger?: (event: Record<string, unknown>) => void;
 }
 

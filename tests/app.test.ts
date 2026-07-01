@@ -1,4 +1,6 @@
 import { createBridgeApp } from "../src/app.js";
+import { once } from "node:events";
+import type { AddressInfo } from "node:net";
 
 describe("bridge app wiring", () => {
   it("creates a server with the claude-cli backend", () => {
@@ -17,7 +19,7 @@ describe("bridge app wiring", () => {
     expect(config.oauthConfigured).toBe(true);
   });
 
-  it("wires production request logging", () => {
+  it("wires production request logging", async () => {
     const events: unknown[] = [];
     const { server } = createBridgeApp({
       env: {
@@ -26,8 +28,19 @@ describe("bridge app wiring", () => {
       logger: (event) => events.push(event)
     });
 
-    expect(server.listening).toBe(false);
-    expect(events).toEqual([]);
+    server.listen(0);
+    await once(server, "listening");
+    const { port } = server.address() as AddressInfo;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
+      expect(response.status).toBe(200);
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
+
+    expect(events).toContainEqual(expect.objectContaining({ event: "request_completed", path: "/health" }));
   });
 
   it("redacts secrets in default production logs", () => {

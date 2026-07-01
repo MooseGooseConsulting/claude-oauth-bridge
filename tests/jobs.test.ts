@@ -1,4 +1,4 @@
-import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -65,7 +65,7 @@ describe("job prompt handling", () => {
     const dir = await mkdtemp(join(tmpdir(), "bridge-workspace-"));
 
     try {
-      await expect(validateWorkspace(dir, [tmpdir()])).resolves.toBe(dir);
+      await expect(validateWorkspace(dir, [tmpdir()])).resolves.toBe(await realpath(dir));
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

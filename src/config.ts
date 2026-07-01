@@ -91,8 +91,9 @@ function parseList(value: string | undefined, fallback: string[]): string[] {
     return fallback;
   }
 
-  return value
+  const parsed = value
     .split(/[;,]/)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+  return parsed.length > 0 ? parsed : fallback;
 }
