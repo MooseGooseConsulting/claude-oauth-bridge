@@ -17,6 +17,8 @@ The bridge runs `claude -p` with `--output-format stream-json` and normalizes th
 
 The bridge also supports the normal local Claude Code login state. If `CLAUDE_CODE_OAUTH_TOKEN` is not set, startup checks for Claude Code's local credentials file at `.claude/.credentials.json` under the process home directory and allows the Claude CLI runtime to authenticate itself. The bridge only checks that the file exists and has content; it does not read or log credential values.
 
+Bridge model-provider endpoints run Claude Code with `--safe-mode` and `--tools ""`. This keeps Claude Code OAuth/keychain authentication available while disabling project customizations, hooks, MCP servers, memory injection, and model-side tool execution for `/v1/messages` and `/v1/chat/completions`. Job-native endpoints also use `--safe-mode` but keep built-in tools available for workspace work.
+
 ## Endpoints
 
 - `GET /health`

@@ -145,8 +145,16 @@ function rejectSystemMessages(messages: RoleMessage[] | undefined): void {
 }
 
 function messagesToPrompt(messages: RoleMessage[]): string {
-  return messages
-    .map((message) => `${roleLabel(validatedRole(message.role))}: ${contentToText(message.content) ?? ""}`)
+  const normalized = messages.map((message) => ({
+    role: validatedRole(message.role),
+    text: contentToText(message.content) ?? ""
+  }));
+  if (normalized.length === 1 && normalized[0]?.role === "user") {
+    return normalized[0].text;
+  }
+
+  return normalized
+    .map((message) => `${roleLabel(message.role)}: ${message.text}`)
     .join("\n\n");
 }
 

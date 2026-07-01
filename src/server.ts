@@ -98,7 +98,8 @@ async function handleRequest(
       effort: normalized.effort,
       prompt: normalized.prompt,
       system: normalized.system,
-      stream: normalized.stream
+      stream: normalized.stream,
+      disableTools: true
     });
 
     writeJson(response, 200, toMessagesResponse(requestId, normalized.model, result), requestId);
@@ -117,7 +118,8 @@ async function handleRequest(
       effort: normalized.effort,
       prompt: normalized.prompt,
       system: normalized.system,
-      stream: normalized.stream
+      stream: normalized.stream,
+      disableTools: true
     });
 
     writeJson(response, 200, toChatCompletionResponse(requestId, normalized.model, result), requestId);

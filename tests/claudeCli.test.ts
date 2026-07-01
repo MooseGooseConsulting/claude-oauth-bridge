@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
 import type { ChildProcess } from "node:child_process";
 
-import { ClaudeCliBackend, collectStream, parseClaudeStreamJson } from "../src/backend/claudeCli.js";
+import { ClaudeCliBackend, buildClaudeArgs, collectStream, parseClaudeStreamJson } from "../src/backend/claudeCli.js";
 
 describe("Claude CLI backend", () => {
   it("parses stream-json assistant text events", () => {
@@ -84,6 +84,34 @@ describe("Claude CLI backend", () => {
     expect(calls[0]?.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(calls[0]?.args).toContain("--output-format");
     expect(calls[0]?.args).toContain("stream-json");
+  });
+
+  it("uses OAuth-compatible safe mode and disables tools for provider calls", () => {
+    const args = buildClaudeArgs({
+      model: "sonnet",
+      effort: "medium",
+      prompt: "Reply ok",
+      stream: false,
+      disableTools: true
+    });
+
+    expect(args).toContain("--safe-mode");
+    expect(args).toContain("--tools");
+    expect(args[args.indexOf("--tools") + 1]).toBe("");
+    expect(args).not.toContain("--bare");
+  });
+
+  it("keeps tools enabled for job-native calls", () => {
+    const args = buildClaudeArgs({
+      model: "sonnet",
+      effort: "high",
+      prompt: "Review the repo",
+      stream: false
+    });
+
+    expect(args).toContain("--safe-mode");
+    expect(args).not.toContain("--tools");
+    expect(args).not.toContain("--bare");
   });
 
   it("rejects Claude output over the configured limit", async () => {

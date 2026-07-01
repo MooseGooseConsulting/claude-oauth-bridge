@@ -151,10 +151,15 @@ export function buildClaudeArgs(request: BackendCompleteRequest): string[] {
     request.model,
     "--effort",
     request.effort,
+    "--safe-mode",
     "--permission-mode",
     "default",
     "--no-session-persistence"
   ];
+
+  if (request.disableTools === true) {
+    args.push("--tools", "");
+  }
 
   if (request.system) {
     args.push("--system-prompt", request.system);

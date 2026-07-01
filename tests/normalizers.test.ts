@@ -78,7 +78,7 @@ describe("message normalization", () => {
       messages: [{ role: "user", content: "Hello" }]
     });
 
-    expect(request.prompt).toBe("User: Hello");
+    expect(request.prompt).toBe("Hello");
   });
 
   it("rejects system role entries in Anthropic-ish messages lists", () => {
@@ -112,7 +112,7 @@ describe("message normalization", () => {
     });
 
     expect(request.system).toBe("Be exact.");
-    expect(request.prompt).toBe("User: Reply exactly: ok");
+    expect(request.prompt).toBe("Reply exactly: ok");
   });
 
   it("normalizes backend text to Anthropic Messages response shape", () => {

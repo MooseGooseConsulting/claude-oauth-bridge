@@ -7,6 +7,7 @@ export interface BackendCompleteRequest {
   system?: string;
   stream: boolean;
   cwd?: string;
+  disableTools?: boolean;
 }
 
 export interface BackendCompleteResult {
