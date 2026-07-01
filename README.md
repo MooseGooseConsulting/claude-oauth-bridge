@@ -15,6 +15,8 @@ The bridge runs `claude -p` with `--output-format stream-json` and normalizes th
 
 `CLAUDE_CODE_OAUTH_TOKEN`, when present, is visible only to this bridge process and the Claude CLI subprocess it owns.
 
+The bridge also supports the normal local Claude Code login state. If `CLAUDE_CODE_OAUTH_TOKEN` is not set, startup checks for Claude Code's local credentials file at `.claude/.credentials.json` under the process home directory and allows the Claude CLI runtime to authenticate itself. The bridge only checks that the file exists and has content; it does not read or log credential values.
+
 ## Endpoints
 
 - `GET /health`
@@ -34,11 +36,12 @@ Models:
 Copy `.env.example` and set values in your process manager or shell.
 
 ```powershell
-$env:CLAUDE_CODE_OAUTH_TOKEN = "..."
 $env:PORT = "8787"
 $env:HOST = "127.0.0.1"
 npm run dev
 ```
+
+First run `claude auth login` or otherwise make sure `claude -p "Reply exactly: ok"` works in the same user account. `CLAUDE_CODE_OAUTH_TOKEN` is optional; if you use it, keep it only in the bridge process environment.
 
 Do not set `ANTHROPIC_API_KEY` for this bridge path. If it exists in the parent environment, the bridge removes it before spawning Claude.
 
@@ -62,6 +65,8 @@ Docker deployments must set `HOST=0.0.0.0` if the bridge should be reachable out
 
 `/v1/messages` currently supports text-only calls. If a request includes `tools`, the bridge returns `tool_use_not_supported` instead of pretending tool calls work.
 
+`max_tokens` and `temperature` are accepted for framework compatibility but are currently no-ops for the `claude-cli` backend.
+
 Tool-call translation should be added only after the Claude runtime event stream exposes clean tool-use semantics for this bridge contract.
 
 ## Jobs
@@ -84,7 +89,6 @@ Live Claude CLI verification is opt-in:
 ```powershell
 $env:RUN_LIVE_CLAUDE = "1"
 $env:CLAUDE_OAUTH_LIVE_READY = "1"
-$env:CLAUDE_CODE_OAUTH_TOKEN = "..."
 npm test -- tests/live.test.ts
 ```
 

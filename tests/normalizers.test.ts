@@ -70,22 +70,15 @@ describe("message normalization", () => {
     ).toThrow(/Streaming is not supported/);
   });
 
-  it("fails loudly for unsupported generation controls instead of silently dropping them", () => {
-    expect(() =>
-      normalizeMessagesRequest({
-        model: "claude-oauth/sonnet",
-        max_tokens: 100,
-        messages: [{ role: "user", content: "Hello" }]
-      })
-    ).toThrow(/max_tokens and temperature are not supported/);
+  it("accepts standard generation controls as no-ops for the claude-cli backend", () => {
+    const request = normalizeMessagesRequest({
+      model: "claude-oauth/sonnet",
+      max_tokens: 100,
+      temperature: 0.4,
+      messages: [{ role: "user", content: "Hello" }]
+    });
 
-    expect(() =>
-      normalizeMessagesRequest({
-        model: "claude-oauth/sonnet",
-        temperature: 0.4,
-        messages: [{ role: "user", content: "Hello" }]
-      })
-    ).toThrow(/max_tokens and temperature are not supported/);
+    expect(request.prompt).toBe("User: Hello");
   });
 
   it("rejects system role entries in Anthropic-ish messages lists", () => {

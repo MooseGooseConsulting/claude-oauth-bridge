@@ -46,7 +46,6 @@ interface ChatCompletionRequest {
 export function normalizeMessagesRequest(request: MessagesRequest): InternalCompletionRequest {
   rejectTools(request.tools);
   rejectStreaming(request.stream);
-  rejectUnsupportedGenerationControls(request.max_tokens, request.temperature);
   rejectSystemMessages(request.messages);
   const model = normalizeModel(request.model);
 
@@ -63,7 +62,6 @@ export function normalizeChatCompletionRequest(
 ): InternalCompletionRequest {
   rejectTools(request.tools);
   rejectStreaming(request.stream);
-  rejectUnsupportedGenerationControls(request.max_tokens, request.temperature);
   const model = normalizeModel(request.model);
   const messages = request.messages ?? [];
   const system = messages
@@ -133,16 +131,6 @@ function rejectTools(tools: unknown[] | undefined): void {
 function rejectStreaming(stream: boolean | undefined): void {
   if (stream === true) {
     throw new HttpError(400, "streaming_not_supported", "Streaming is not supported by this bridge");
-  }
-}
-
-function rejectUnsupportedGenerationControls(maxTokens: number | undefined, temperature: number | undefined): void {
-  if (maxTokens !== undefined || temperature !== undefined) {
-    throw new HttpError(
-      400,
-      "generation_control_not_supported",
-      "max_tokens and temperature are not supported by the claude-cli backend"
-    );
   }
 }
 

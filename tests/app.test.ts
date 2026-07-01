@@ -1,6 +1,9 @@
 import { createBridgeApp } from "../src/app.js";
 import { once } from "node:events";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("bridge app wiring", () => {
   it("creates a server with the claude-cli backend", () => {
@@ -17,6 +20,27 @@ describe("bridge app wiring", () => {
     expect(config.host).toBe("127.0.0.1");
     expect(config.bridgeApiKey).toBeDefined();
     expect(config.oauthConfigured).toBe(true);
+  });
+
+  it("uses local Claude Code credentials as the default OAuth probe", () => {
+    const root = mkdtempSync(join(tmpdir(), "claude-app-creds-"));
+    const claudeDir = join(root, ".claude");
+    mkdirSync(claudeDir);
+    writeFileSync(join(claudeDir, ".credentials.json"), "{\"note\":\"present\"}");
+
+    try {
+      const { config } = createBridgeApp({
+        env: {
+          BRIDGE_AUTH_DISABLED: "1",
+          HOME: root,
+          USERPROFILE: root
+        }
+      });
+
+      expect(config.oauthConfigured).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("wires production request logging", async () => {
