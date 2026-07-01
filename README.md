@@ -101,3 +101,63 @@ npm test -- tests/live.test.ts
 3. Hermes provider adapter.
 4. Letta provider adapter.
 5. Webhook-triggered repo automation runner.
+
+## Mastra Adapter
+
+The Mastra adapter lives at `src/adapters/mastra/claudeOauthGateway.ts`. The import paths below are repo-local examples for this bridge project.
+
+```ts
+import { Mastra } from "@mastra/core";
+import { Agent } from "@mastra/core/agent";
+import { ClaudeOauthMastraGateway } from "./src/adapters/mastra/claudeOauthGateway.js";
+
+export const mastra = new Mastra({
+  gateways: {
+    "claude-oauth": new ClaudeOauthMastraGateway({
+      bridgeUrl: process.env.CLAUDE_OAUTH_BRIDGE_URL,
+      bridgeApiKey: process.env.CLAUDE_OAUTH_BRIDGE_API_KEY
+    })
+  }
+});
+
+export const agent = new Agent({
+  id: "bridge-agent",
+  name: "Bridge Agent",
+  instructions: "You answer through the local Claude OAuth bridge.",
+  model: "claude-oauth/claude-oauth/sonnet"
+});
+```
+
+Mastra router model strings are `gateway/provider/model`, so the gateway form is:
+
+- `claude-oauth/claude-oauth/sonnet`
+- `claude-oauth/claude-oauth/sonnet-high`
+
+For simpler integrations, create the model directly:
+
+```ts
+import { createClaudeOauthMastraModel } from "./src/adapters/mastra/claudeOauthGateway.js";
+
+const model = createClaudeOauthMastraModel("claude-oauth/sonnet", {
+  bridgeUrl: process.env.CLAUDE_OAUTH_BRIDGE_URL,
+  bridgeApiKey: process.env.CLAUDE_OAUTH_BRIDGE_API_KEY
+});
+```
+
+The direct factory accepts the bridge model ids:
+
+- `claude-oauth/sonnet`
+- `claude-oauth/sonnet-high`
+
+Mastra must not receive `CLAUDE_CODE_OAUTH_TOKEN`. The bridge owns Claude OAuth. The Mastra adapter only receives:
+
+- `CLAUDE_OAUTH_BRIDGE_URL`
+- `CLAUDE_OAUTH_BRIDGE_API_KEY`, if bridge auth is enabled
+
+`BRIDGE_API_KEY` configures the bridge server. `CLAUDE_OAUTH_BRIDGE_API_KEY` is the Mastra-side client variable; set it to the same value when bridge auth is enabled. If the bridge is running with `BRIDGE_AUTH_DISABLED=1`, the adapter can be constructed without `CLAUDE_OAUTH_BRIDGE_API_KEY`.
+
+Current limitations:
+
+- Tool calls are rejected with `tool_use_not_supported`.
+- Streaming is rejected with `streaming_not_supported`.
+- Structured output should be handled by Mastra-side parsing or a later bridge capability PR.
