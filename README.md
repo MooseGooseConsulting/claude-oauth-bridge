@@ -104,7 +104,7 @@ npm test -- tests/live.test.ts
 
 ## Mastra Adapter
 
-The Mastra adapter lives at `src/adapters/mastra/claudeOauthGateway.ts`.
+The Mastra adapter lives at `src/adapters/mastra/claudeOauthGateway.ts`. The import paths below are repo-local examples for this bridge project.
 
 ```ts
 import { Mastra } from "@mastra/core";
@@ -153,6 +153,8 @@ Mastra must not receive `CLAUDE_CODE_OAUTH_TOKEN`. The bridge owns Claude OAuth.
 
 - `CLAUDE_OAUTH_BRIDGE_URL`
 - `CLAUDE_OAUTH_BRIDGE_API_KEY`, if bridge auth is enabled
+
+`BRIDGE_API_KEY` configures the bridge server. `CLAUDE_OAUTH_BRIDGE_API_KEY` is the Mastra-side client variable; set it to the same value when bridge auth is enabled. If the bridge is running with `BRIDGE_AUTH_DISABLED=1`, the adapter can be constructed without `CLAUDE_OAUTH_BRIDGE_API_KEY`.
 
 Current limitations:
 

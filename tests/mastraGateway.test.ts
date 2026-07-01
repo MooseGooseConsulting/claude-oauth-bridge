@@ -43,7 +43,7 @@ describe("Claude OAuth Mastra gateway", () => {
     expect(() => toBridgeModelId("claude-oauth/opus")).toThrow(/model_not_supported/);
   });
 
-  it("does not read or expose CLAUDE_CODE_OAUTH_TOKEN", async () => {
+  it("copies only adapter bridge env values and does not expose Claude OAuth", async () => {
     const gateway = new ClaudeOauthMastraGateway({
       bridgeUrl: "http://localhost:8787",
       env: {
@@ -59,15 +59,13 @@ describe("Claude OAuth Mastra gateway", () => {
     });
   });
 
-  it("requires the bridge API key unless callers explicitly provide one", async () => {
+  it("allows construction when the local bridge has auth disabled", async () => {
     const gateway = new ClaudeOauthMastraGateway({
       bridgeUrl: "http://localhost:8787",
       env: {}
     });
 
-    await expect(gateway.getApiKey("claude-oauth/sonnet")).rejects.toThrow(
-      /CLAUDE_OAUTH_BRIDGE_API_KEY/
-    );
+    await expect(gateway.getApiKey("claude-oauth/sonnet")).resolves.toBe("bridge-auth-disabled");
   });
 
   it("creates an AI SDK language model pointed at the bridge", async () => {

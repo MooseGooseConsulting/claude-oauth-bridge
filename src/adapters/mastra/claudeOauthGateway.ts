@@ -48,14 +48,12 @@ export class ClaudeOauthMastraGateway extends MastraModelGateway {
 
   private readonly bridgeUrl?: string;
   private readonly bridgeApiKey?: string;
-  private readonly env: Partial<Record<string, string | undefined>>;
   private readonly customFetch?: FetchFunction;
 
   constructor(options: ClaudeOauthMastraGatewayOptions = {}) {
     super();
-    this.bridgeUrl = options.bridgeUrl;
-    this.bridgeApiKey = options.bridgeApiKey;
-    this.env = options.env ?? process.env;
+    this.bridgeUrl = options.bridgeUrl ?? options.env?.[BRIDGE_URL_ENV] ?? process.env[BRIDGE_URL_ENV];
+    this.bridgeApiKey = options.bridgeApiKey ?? options.env?.[BRIDGE_API_KEY_ENV] ?? process.env[BRIDGE_API_KEY_ENV];
     this.customFetch = options.customFetch;
   }
 
@@ -76,11 +74,7 @@ export class ClaudeOauthMastraGateway extends MastraModelGateway {
   }
 
   async getApiKey(_modelId: string): Promise<string> {
-    const apiKey = this.bridgeApiKey ?? this.env[BRIDGE_API_KEY_ENV];
-    if (apiKey === undefined || apiKey.trim().length === 0) {
-      throw new Error(`Missing ${BRIDGE_API_KEY_ENV}. Set it to the bridge API key or disable bridge auth for local tests.`);
-    }
-    return apiKey;
+    return resolveBridgeApiKey(this.bridgeApiKey);
   }
 
   override handlesModel(modelId: string): boolean {
@@ -115,7 +109,7 @@ export class ClaudeOauthMastraGateway extends MastraModelGateway {
   }
 
   private resolveBridgeBaseUrl(): string {
-    return normalizeBridgeUrl(this.bridgeUrl ?? this.env[BRIDGE_URL_ENV] ?? DEFAULT_BRIDGE_URL);
+    return normalizeBridgeUrl(this.bridgeUrl ?? DEFAULT_BRIDGE_URL);
   }
 
   private optionsFetch(): FetchFunction | undefined {
@@ -136,13 +130,9 @@ export function createClaudeOauthMastraModel(
     options.env?.[BRIDGE_API_KEY_ENV] ??
     process.env[BRIDGE_API_KEY_ENV];
 
-  if (apiKey === undefined || apiKey.trim().length === 0) {
-    throw new Error(`Missing ${BRIDGE_API_KEY_ENV}. Set it to the bridge API key or disable bridge auth for local tests.`);
-  }
-
   return createOpenAICompatible({
     name: PROVIDER_ID,
-    apiKey,
+    apiKey: resolveBridgeApiKey(apiKey),
     baseURL,
     fetch: options.customFetch,
     transformRequestBody: rejectUnsupportedBridgeRequest,
@@ -165,6 +155,10 @@ export function rejectUnsupportedBridgeRequest(body: Record<string, unknown>): R
 export function normalizeBridgeUrl(url: string): string {
   const trimmed = url.replace(/\/+$/, "");
   return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+}
+
+function resolveBridgeApiKey(apiKey: string | undefined): string {
+  return apiKey?.trim() || "bridge-auth-disabled";
 }
 
 export function toBridgeModelId(modelId: string): ClaudeOauthMastraModelId {
