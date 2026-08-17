@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,11 +45,18 @@ describe("job prompt handling", () => {
     expect(result).toEqual({ summary: "plain output", rawText: "plain output" });
   });
 
+  it("falls back to raw text when structured job JSON is missing summary", () => {
+    const text = '{"changedFiles":[]}';
+    const result = parseJobResult(text);
+
+    expect(result).toEqual({ summary: text, rawText: text });
+  });
+
   it("rejects non-existent workspaces for jobs", async () => {
     const { validateWorkspace } = await import("../src/jobs.js");
 
-    await expect(validateWorkspace(join(tmpdir(), "missing-bridge-workspace"))).rejects.toThrow(
-      /workspace_not_found/
+    await expect(validateWorkspace(join(tmpdir(), "missing-bridge-workspace"), [tmpdir()])).rejects.toThrow(
+      /Workspace not found/
     );
   });
 
@@ -58,9 +65,40 @@ describe("job prompt handling", () => {
     const dir = await mkdtemp(join(tmpdir(), "bridge-workspace-"));
 
     try {
-      await expect(validateWorkspace(dir)).resolves.toBe(dir);
+      await expect(validateWorkspace(dir, [tmpdir()])).resolves.toBe(await realpath(dir));
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects existing workspaces outside allowed roots", async () => {
+    const { validateWorkspace } = await import("../src/jobs.js");
+    const dir = await mkdtemp(join(tmpdir(), "bridge-workspace-"));
+
+    try {
+      await expect(validateWorkspace(dir, [join(tmpdir(), "other-root")])).rejects.toThrow(
+        /not under an allowed root/
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects symlinked workspaces that resolve outside allowed roots", async () => {
+    const { validateWorkspace } = await import("../src/jobs.js");
+    const allowedRoot = await mkdtemp(join(tmpdir(), "bridge-allowed-"));
+    const outsideRoot = await mkdtemp(join(tmpdir(), "bridge-outside-"));
+    const linkedWorkspace = join(allowedRoot, "linked-outside");
+
+    try {
+      await symlink(outsideRoot, linkedWorkspace, "junction");
+
+      await expect(validateWorkspace(linkedWorkspace, [allowedRoot])).rejects.toThrow(
+        /not under an allowed root/
+      );
+    } finally {
+      await rm(allowedRoot, { recursive: true, force: true });
+      await rm(outsideRoot, { recursive: true, force: true });
     }
   });
 });
