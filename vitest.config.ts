@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     restoreMocks: true,
+    exclude: ["**/node_modules/**", "**/dist/**", "**/coverage/**"],
     testTimeout: 10_000
   }
 });

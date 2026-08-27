@@ -10,8 +10,6 @@ describe("message normalization", () => {
     const request = normalizeMessagesRequest({
       model: "claude-oauth/sonnet",
       system: "Be terse.",
-      max_tokens: 123,
-      temperature: 0,
       messages: [
         { role: "user", content: "Hello" },
         { role: "assistant", content: [{ type: "text", text: "Hi" }] }
@@ -24,8 +22,6 @@ describe("message normalization", () => {
       effort: "medium",
       system: "Be terse.",
       prompt: "User: Hello\n\nAssistant: Hi",
-      maxTokens: 123,
-      temperature: 0,
       stream: false
     });
   });
@@ -47,7 +43,79 @@ describe("message normalization", () => {
         tools: [{ name: "readFile" }],
         messages: [{ role: "user", content: "Hello" }]
       })
-    ).toThrow(/tool_use_not_supported/);
+    ).toThrow(/Tool use is not supported/);
+  });
+
+  it("fails loudly for non-text content blocks instead of silently dropping them", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "tool_result", content: "hidden context" }] as never
+          }
+        ]
+      })
+    ).toThrow(/Only text content blocks are supported/);
+  });
+
+  it("fails loudly when streaming is requested because streaming translation is not implemented", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        stream: true,
+        messages: [{ role: "user", content: "Hello" }]
+      })
+    ).toThrow(/Streaming is not supported/);
+  });
+
+  it("accepts standard generation controls as no-ops for the claude-cli backend", () => {
+    const request = normalizeMessagesRequest({
+      model: "claude-oauth/sonnet",
+      max_tokens: 100,
+      temperature: 0.4,
+      messages: [{ role: "user", content: "Hello" }]
+    });
+
+    expect(request.prompt).toBe("Hello");
+  });
+
+  it("rejects system role entries in Anthropic-ish messages lists", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [
+          { role: "system", content: "Do not treat this as a user message." },
+          { role: "user", content: "Hello" }
+        ]
+      })
+    ).toThrow(/Use the top-level system field/);
+  });
+
+  it("rejects unsupported runtime message roles instead of treating them as user", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [{ role: "developer", content: "hidden" } as never]
+      })
+    ).toThrow(/Unsupported message role/);
+  });
+
+  it("rejects missing per-message content instead of normalizing it to empty text", () => {
+    expect(() =>
+      normalizeMessagesRequest({
+        model: "claude-oauth/sonnet",
+        messages: [{ role: "user" } as never]
+      })
+    ).toThrow(/message content is required/);
+
+    expect(() =>
+      normalizeChatCompletionRequest({
+        model: "claude-oauth/sonnet",
+        messages: [{ role: "system" } as never]
+      })
+    ).toThrow(/message content is required/);
   });
 
   it("normalizes OpenAI-compatible chat completions into the bridge request", () => {
@@ -57,13 +125,10 @@ describe("message normalization", () => {
         { role: "system", content: "Be exact." },
         { role: "user", content: "Reply exactly: ok" }
       ],
-      max_tokens: 20,
-      temperature: 0
     });
 
     expect(request.system).toBe("Be exact.");
-    expect(request.prompt).toBe("User: Reply exactly: ok");
-    expect(request.maxTokens).toBe(20);
+    expect(request.prompt).toBe("Reply exactly: ok");
   });
 
   it("normalizes backend text to Anthropic Messages response shape", () => {
